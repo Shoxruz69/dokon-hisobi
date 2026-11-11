@@ -9,6 +9,8 @@ services:
     envVars:
       - key: BOT_TOKEN
         sync: false
+      - key: DATABASE_URL
+        sync: false
       - key: ADMIN_TELEGRAM_ID
         value: "6876312568"
       - key: MINI_APP_URL
@@ -19,3 +21,4 @@ services:
         value: Asia/Tashkent
       - key: WEB_SERVER_HOST
         value: 0.0.0.0
+
