@@ -1,6 +1,9 @@
+import os
 import logging
+import aiohttp
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from config import settings
 from database.queries import (
     get_debts_for_notification,
     update_overdue_statuses,
@@ -80,11 +83,23 @@ async def send_reminders(bot):
     except Exception as e:
         logger.error(f"❌ 3-kunlik eslatmalar siklida xato: {e}")
 
+async def keep_alive_ping():
+    """Render Free tier'da server 15 daqiqada uxlab qolmasligi uchun doimiy ping"""
+    url = os.getenv("RENDER_EXTERNAL_URL") or settings.MINI_APP_URL
+    if url and url.startswith("https://"):
+        try:
+            target = f"{url.rstrip('/')}/favicon.ico"
+            async with aiohttp.ClientSession() as session:
+                async with session.get(target, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                    logger.debug(f"Keep-alive ping muvaffaqiyatli: {resp.status}")
+        except Exception:
+            pass
+
 def setup_scheduler(bot) -> AsyncIOScheduler:
     """Scheduler yaratish va ishga sozlash"""
     scheduler = AsyncIOScheduler(timezone="Asia/Tashkent")
     
-    # Har kuni soat 09:00 da
+    # Har kuni soat 09:00 da eslatmalar
     scheduler.add_job(
         send_reminders,
         trigger=CronTrigger(hour=9, minute=0),
@@ -95,5 +110,14 @@ def setup_scheduler(bot) -> AsyncIOScheduler:
         misfire_grace_time=3600
     )
     
+    # Har 10 daqiqada Render Free uxlab qolmasligi uchun keep-alive
+    scheduler.add_job(
+        keep_alive_ping,
+        trigger="interval",
+        minutes=10,
+        id="render_keep_alive",
+        name="Render Keep Alive Ping",
+        replace_existing=True
+    )
+    
     return scheduler
-
