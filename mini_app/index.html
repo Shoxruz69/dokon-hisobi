@@ -1,0 +1,1968 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#10B981">
+  <title>Dokon Hisobi — Boshqaruv Paneli</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    /* ============================================================
+       CLEAN LIGHT FINTECH THEME (PURE SVG ICONS)
+       ============================================================ */
+    :root {
+      color-scheme: light;
+      --primary: #10B981;
+      --primary-dark: #059669;
+      --primary-light: rgba(16, 185, 129, 0.1);
+      --primary-gradient: linear-gradient(135deg, #10B981 0%, #059669 100%);
+      
+      --danger: #EF4444;
+      --danger-light: rgba(239, 68, 68, 0.1);
+      --danger-gradient: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+      
+      --warning: #F59E0B;
+      --warning-light: rgba(245, 158, 11, 0.1);
+      
+      --bg-page: #F8FAFC;
+      --bg-card: #FFFFFF;
+      --bg-input: #F1F5F9;
+      --bg-nav: rgba(255, 255, 255, 0.95);
+      
+      --border: #E2E8F0;
+      --border-focus: #10B981;
+      
+      --text-main: #0F172A;
+      --text-muted: #64748B;
+      --text-light: #94A3B8;
+      
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 4px 16px -2px rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 10px 25px -5px rgba(16, 185, 129, 0.2);
+      
+      --radius-sm: 10px;
+      --radius-md: 14px;
+      --radius-lg: 18px;
+      --radius-full: 9999px;
+      
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    input, textarea {
+      user-select: auto;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-page);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding-bottom: calc(84px + var(--safe-bottom));
+      overflow-x: hidden;
+    }
+
+    /* ============================================================
+       HEADER
+       ============================================================ */
+    .app-header {
+      background: var(--bg-nav);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 18px;
+      padding-top: calc(14px + var(--safe-top));
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-icon-box {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-sm);
+      background: var(--primary-gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+    }
+
+    .header-title-box h1 {
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      line-height: 1.2;
+      color: var(--text-main);
+    }
+
+    .shop-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--primary);
+      background: var(--primary-light);
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      margin-top: 3px;
+    }
+
+    .shop-badge-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--primary);
+      border-radius: 50%;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .icon-btn:active {
+      transform: scale(0.92);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    /* ============================================================
+       SCREENS
+       ============================================================ */
+    .screen {
+      display: none;
+      padding: 16px;
+      max-width: 600px;
+      margin: 0 auto;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ============================================================
+       HERO CARD
+       ============================================================ */
+    .hero-card {
+      background: var(--primary-gradient);
+      border-radius: var(--radius-lg);
+      padding: 22px 20px;
+      color: white;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .hero-card::after {
+      content: '';
+      position: absolute;
+      right: -25px;
+      bottom: -25px;
+      width: 130px;
+      height: 130px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .hero-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .hero-label {
+      font-size: 12px;
+      font-weight: 700;
+      opacity: 0.9;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    .hero-amount {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.8px;
+      margin: 8px 0 16px;
+    }
+
+    .hero-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .hero-btn {
+      background: rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      padding: 11px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .hero-btn:active {
+      background: rgba(255, 255, 255, 0.35);
+      transform: scale(0.97);
+    }
+
+    /* ============================================================
+       STATS GRID
+       ============================================================ */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      box-shadow: var(--shadow-sm);
+      position: relative;
+    }
+
+    .stat-card.danger-card {
+      background: var(--danger-light);
+      border-color: rgba(239, 68, 68, 0.2);
+    }
+
+    .stat-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .stat-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .stat-card.danger-card .stat-icon {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--danger);
+    }
+
+    .stat-card:not(.danger-card) .stat-icon {
+      background: var(--primary-light);
+      color: var(--primary);
+    }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text-main);
+      line-height: 1.2;
+    }
+
+    .stat-card.danger-card .stat-value {
+      color: var(--danger);
+    }
+
+    .stat-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* ============================================================
+       SECTION TITLE
+       ============================================================ */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 20px 0 12px;
+    }
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--text-main);
+      letter-spacing: -0.3px;
+    }
+
+    .section-link {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--primary);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* ============================================================
+       SEARCH & FILTERS
+       ============================================================ */
+    .search-wrapper {
+      position: relative;
+      margin-bottom: 12px;
+    }
+
+    .search-input {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 13px 16px 13px 44px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-main);
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-light);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-light);
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+    }
+
+    .filter-pills {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      margin-bottom: 14px;
+      scrollbar-width: none;
+    }
+
+    .filter-pills::-webkit-scrollbar {
+      display: none;
+    }
+
+    .filter-pill {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 8px 14px;
+      border-radius: var(--radius-full);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .filter-pill.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* ============================================================
+       CUSTOMER CARDS
+       ============================================================ */
+    .customer-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.15s;
+    }
+
+    .customer-card:active {
+      transform: scale(0.985);
+      border-color: var(--primary);
+    }
+
+    .avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-md);
+      background: var(--primary-gradient);
+      color: white;
+      font-size: 16px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .avatar.overdue-avatar {
+      background: var(--danger-gradient);
+    }
+
+    .customer-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .customer-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .customer-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .customer-right {
+      text-align: right;
+    }
+
+    .customer-debt {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--danger);
+      line-height: 1.2;
+    }
+
+    .customer-debt.zero-debt {
+      color: var(--primary);
+    }
+
+    .customer-due {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-light);
+      margin-top: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 3px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: var(--radius-full);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .dot-danger { background: var(--danger); }
+    .dot-warning { background: var(--warning); }
+    .dot-success { background: var(--primary); }
+
+    .badge-overdue {
+      background: var(--danger-light);
+      color: var(--danger);
+    }
+
+    .badge-active {
+      background: var(--warning-light);
+      color: var(--warning);
+    }
+
+    .badge-paid {
+      background: var(--primary-light);
+      color: var(--primary);
+    }
+
+    /* ============================================================
+       FORM CONTROLS
+       ============================================================ */
+    .form-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 6px;
+    }
+
+    .input-box {
+      position: relative;
+    }
+
+    .input-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-light);
+      display: flex;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    .custom-input {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1.5px solid transparent;
+      border-radius: var(--radius-sm);
+      padding: 13px 16px 13px 44px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-main);
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+
+    .custom-input:focus {
+      outline: none;
+      background: var(--bg-card);
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-light);
+    }
+
+    .custom-input.error {
+      border-color: var(--danger);
+      background: var(--danger-light);
+    }
+
+    .error-msg {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--danger);
+      margin-top: 4px;
+      display: none;
+    }
+
+    .error-msg.show {
+      display: block;
+    }
+
+    .chips-group {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .chip-btn {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 11px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+
+    .chip-btn:active {
+      background: var(--primary);
+      color: white;
+    }
+
+    /* ============================================================
+       BUTTONS
+       ============================================================ */
+    .btn-main {
+      width: 100%;
+      background: var(--primary-gradient);
+      color: white;
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 15px 20px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      box-shadow: var(--shadow-lg);
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .btn-main:active {
+      transform: scale(0.98);
+      filter: brightness(0.95);
+    }
+
+    .btn-subtle {
+      width: 100%;
+      background: var(--bg-input);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 13px;
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      margin-top: 10px;
+      font-family: inherit;
+    }
+
+    /* ============================================================
+       DEBT ITEM
+       ============================================================ */
+    .debt-item-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .debt-item-card.overdue-card {
+      border-left: 4px solid var(--danger);
+    }
+
+    .debt-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .debt-desc {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .debt-amount-big {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--danger);
+      margin-top: 2px;
+    }
+
+    .debt-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 4px 0;
+    }
+
+    .btn-pay {
+      width: 100%;
+      background: var(--primary-light);
+      color: var(--primary-dark);
+      border: 1.5px solid var(--primary);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+
+    .btn-pay:active {
+      background: var(--primary);
+      color: white;
+    }
+
+    /* ============================================================
+       BOTTOM NAVIGATION
+       ============================================================ */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--bg-nav);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding: 8px 12px calc(8px + var(--safe-bottom));
+      z-index: 1000;
+    }
+
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      border: none;
+      background: none;
+      color: var(--text-light);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 6px 0;
+      border-radius: var(--radius-sm);
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .nav-item svg {
+      width: 22px;
+      height: 22px;
+      stroke: currentColor;
+      transition: all 0.2s;
+    }
+
+    .nav-item.active {
+      color: var(--primary);
+    }
+
+    .nav-item.active svg {
+      stroke: var(--primary);
+      transform: translateY(-2px);
+    }
+
+    /* ============================================================
+       EMPTY STATE & LOADERS
+       ============================================================ */
+    .empty-box {
+      text-align: center;
+      padding: 44px 20px;
+      color: var(--text-muted);
+    }
+
+    .empty-icon-wrap {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: var(--bg-input);
+      color: var(--text-muted);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+
+    .empty-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-bottom: 5px;
+    }
+
+    .empty-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .spinner-box {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 40px 0;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ============================================================
+       TOAST ALERTS
+       ============================================================ */
+    .toast-alert {
+      position: fixed;
+      top: calc(20px + var(--safe-top));
+      left: 50%;
+      transform: translateX(-50%) translateY(-30px);
+      background: var(--text-main);
+      color: white;
+      padding: 12px 20px;
+      border-radius: var(--radius-full);
+      font-size: 13px;
+      font-weight: 700;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      z-index: 2000;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .toast-alert.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    .toast-alert.toast-success {
+      background: var(--primary);
+    }
+
+    .toast-alert.toast-error {
+      background: var(--danger);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="header-icon-box">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+      </div>
+      <div class="header-title-box">
+        <h1 id="headerShopTitle">Dokon Hisobi</h1>
+        <div class="shop-badge">
+          <span class="shop-badge-dot"></span>
+          <span id="shopIdText">Yuklanmoqda...</span>
+        </div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" onclick="refreshCurrentScreen()" title="Yangilash">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       SCREEN: DASHBOARD
+       ============================================================ -->
+  <main class="screen active" id="screen-dashboard">
+    <!-- HERO CARD -->
+    <div class="hero-card">
+      <div class="hero-top">
+        <div class="hero-label">Umumiy Faol Qarz</div>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" opacity="0.8">
+          <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+      </div>
+      <div class="hero-amount" id="stat-hero-debt">0 so'm</div>
+      <div class="hero-actions">
+        <button class="hero-btn" onclick="showScreen('add')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Qarz qo'shish
+        </button>
+        <button class="hero-btn" onclick="showScreen('customers')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          Mijozlar
+        </button>
+      </div>
+    </div>
+
+    <!-- METRICS GRID -->
+    <div class="stats-grid">
+      <div class="stat-card danger-card">
+        <div class="stat-card-header">
+          <div class="stat-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <span class="badge badge-overdue">
+            <span class="badge-dot dot-danger"></span> Kechikkan
+          </span>
+        </div>
+        <div class="stat-value" id="stat-overdue">0 ta</div>
+        <div class="stat-label">Muddati o'tgan qarzlar</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-card-header">
+          <div class="stat-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <span class="badge badge-active">
+            <span class="badge-dot dot-warning"></span> Faol
+          </span>
+        </div>
+        <div class="stat-value" id="stat-active">0 ta</div>
+        <div class="stat-label">Faol qarzlar soni</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-card-header">
+          <div class="stat-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            </svg>
+          </div>
+        </div>
+        <div class="stat-value" id="stat-customers">0 ta</div>
+        <div class="stat-label">Jami mijozlar</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-card-header">
+          <div class="stat-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </div>
+        </div>
+        <div class="stat-value" id="stat-week">0 ta</div>
+        <div class="stat-label">Bu hafta to'lanishi kerak</div>
+      </div>
+    </div>
+
+    <!-- RECENT CUSTOMERS PREVIEW -->
+    <div class="section-header">
+      <h2 class="section-title">Oxirgi mijozlar</h2>
+      <span class="section-link" onclick="showScreen('customers')">
+        Barchasi
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </span>
+    </div>
+
+    <div id="dashboardRecentList">
+      <div class="spinner-box"><div class="spinner"></div></div>
+    </div>
+  </main>
+
+  <!-- ============================================================
+       SCREEN: CUSTOMERS
+       ============================================================ -->
+  <main class="screen" id="screen-customers">
+    <!-- SEARCH -->
+    <div class="search-wrapper">
+      <span class="search-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+      </span>
+      <input type="text" class="search-input" id="customerSearchInput" 
+             placeholder="Ism yoki telefon bo'yicha qidirish..." 
+             oninput="handleSearch(this.value)">
+    </div>
+
+    <!-- FILTERS -->
+    <div class="filter-pills">
+      <button class="filter-pill active" onclick="setFilter('all', this)">Barchasi</button>
+      <button class="filter-pill" onclick="setFilter('overdue', this)">
+        <span class="badge-dot dot-danger"></span> Kechikkan
+      </button>
+      <button class="filter-pill" onclick="setFilter('active', this)">
+        <span class="badge-dot dot-warning"></span> Faol
+      </button>
+      <button class="filter-pill" onclick="setFilter('paid', this)">
+        <span class="badge-dot dot-success"></span> Qarz yo'q
+      </button>
+    </div>
+
+    <!-- LIST -->
+    <div id="customersListContainer">
+      <div class="spinner-box"><div class="spinner"></div></div>
+    </div>
+  </main>
+
+  <!-- ============================================================
+       SCREEN: ADD CUSTOMER
+       ============================================================ -->
+  <main class="screen" id="screen-add">
+    <div class="section-header" style="margin-top:0">
+      <h2 class="section-title">Yangi Qarz Qo'shish</h2>
+    </div>
+
+    <div class="form-card">
+      <!-- Ism -->
+      <div class="form-group">
+        <label class="form-label">Mijoz Ism Familiyasi *</label>
+        <div class="input-box">
+          <span class="input-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+          </span>
+          <input type="text" class="custom-input" id="inp-name" placeholder="Aliyev Bobur">
+        </div>
+        <div class="error-msg" id="err-name"></div>
+      </div>
+
+      <!-- Telefon -->
+      <div class="form-group">
+        <label class="form-label">Telefon Raqami *</label>
+        <div class="input-box">
+          <span class="input-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+            </svg>
+          </span>
+          <input type="tel" class="custom-input" id="inp-phone" placeholder="+998 90 123 45 67">
+        </div>
+        <div class="error-msg" id="err-phone"></div>
+      </div>
+
+      <!-- Summa -->
+      <div class="form-group">
+        <label class="form-label">Qarz Summasi (so'mda) *</label>
+        <div class="input-box">
+          <span class="input-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/>
+            </svg>
+          </span>
+          <input type="number" class="custom-input" id="inp-amount" placeholder="150000" min="100">
+        </div>
+        <div class="chips-group">
+          <button type="button" class="chip-btn" onclick="setQuickAmount(50000)">+50 000</button>
+          <button type="button" class="chip-btn" onclick="setQuickAmount(100000)">+100 000</button>
+          <button type="button" class="chip-btn" onclick="setQuickAmount(500000)">+500 000</button>
+          <button type="button" class="chip-btn" onclick="setQuickAmount(1000000)">+1 000 000</button>
+        </div>
+        <div class="error-msg" id="err-amount"></div>
+      </div>
+
+      <!-- Mahsulot -->
+      <div class="form-group">
+        <label class="form-label">Nima oldi (Mahsulotlar) *</label>
+        <div class="input-box">
+          <span class="input-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            </svg>
+          </span>
+          <input type="text" class="custom-input" id="inp-desc" placeholder="Un 10kg, Yog' 2L, Shakar 3kg">
+        </div>
+        <div class="error-msg" id="err-desc"></div>
+      </div>
+
+      <!-- Sana -->
+      <div class="form-group">
+        <label class="form-label">To'lov Muddati *</label>
+        <div class="input-box">
+          <span class="input-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </span>
+          <input type="date" class="custom-input" id="inp-date">
+        </div>
+        <div class="chips-group">
+          <button type="button" class="chip-btn" onclick="setQuickDays(3)">+3 kun</button>
+          <button type="button" class="chip-btn" onclick="setQuickDays(7)">+1 hafta</button>
+          <button type="button" class="chip-btn" onclick="setQuickDays(15)">+15 kun</button>
+          <button type="button" class="chip-btn" onclick="setQuickDays(30)">+1 oy</button>
+        </div>
+        <div class="error-msg" id="err-date"></div>
+      </div>
+
+      <!-- Izoh -->
+      <div class="form-group">
+        <label class="form-label">Qo'shimcha Izoh (ixtiyoriy)</label>
+        <div class="input-box">
+          <span class="input-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+          </span>
+          <input type="text" class="custom-input" id="inp-notes" placeholder="Qo'shni ko'cha, 4-uy">
+        </div>
+      </div>
+
+      <button class="btn-main" id="submitBtn" onclick="submitForm()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Qarzni Saqlash
+      </button>
+      <button class="btn-subtle" onclick="showScreen('customers')">
+        Bekor qilish
+      </button>
+    </div>
+  </main>
+
+  <!-- ============================================================
+       SCREEN: DETAIL
+       ============================================================ -->
+  <main class="screen" id="screen-detail">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <button class="icon-btn" onclick="showScreen('customers')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+        </svg>
+      </button>
+      <h2 class="section-title" style="margin:0">Mijoz Kartochkasi</h2>
+    </div>
+    
+    <div id="customerDetailContent">
+      <div class="spinner-box"><div class="spinner"></div></div>
+    </div>
+  </main>
+
+  <!-- ============================================================
+       SCREEN: STATS
+       ============================================================ -->
+  <main class="screen" id="screen-stats">
+    <div class="section-header" style="margin-top:0">
+      <h2 class="section-title">Moliyaviy Hisobot</h2>
+    </div>
+
+    <div id="statsDetailContent">
+      <div class="spinner-box"><div class="spinner"></div></div>
+    </div>
+  </main>
+
+  <!-- ============================================================
+       CUSTOMER PORTAL (FAQAT MIJOZ UCHUN SHAXSIY KABINET)
+       ============================================================ -->
+  <main class="screen" id="screen-customer">
+    <div id="customerPortalContent">
+      <div class="spinner-box"><div class="spinner"></div></div>
+    </div>
+  </main>
+
+  <!-- ============================================================
+       BOTTOM NAVIGATION
+       ============================================================ -->
+  <nav class="bottom-nav" id="bottomNav">
+    <button class="nav-item active" id="nav-dashboard" onclick="showScreen('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+        <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+      </svg>
+      Asosiy
+    </button>
+    <button class="nav-item" id="nav-customers" onclick="showScreen('customers')">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+      </svg>
+      Mijozlar
+    </button>
+    <button class="nav-item" id="nav-add" onclick="showScreen('add')">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+      </svg>
+      Qo'shish
+    </button>
+    <button class="nav-item" id="nav-stats" onclick="showScreen('stats')">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+      </svg>
+      Statistika
+    </button>
+  </nav>
+
+  <!-- TOAST ALERT -->
+  <div class="toast-alert" id="toastAlert"></div>
+
+  <!-- APPLICATION LOGIC -->
+  <script>
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      if (tg.setHeaderColor) tg.setHeaderColor('#10B981');
+      if (tg.setBackgroundColor) tg.setBackgroundColor('#F8FAFC');
+    }
+
+    document.documentElement.classList.remove('dark');
+    document.body.classList.remove('dark');
+
+    let currentScreen = 'dashboard';
+    let currentFilter = 'all';
+    let allCustomers = [];
+    let activeCustomerId = null;
+    let shopData = {
+      shopId: '',
+      shopName: "Do'kon Hisobi"
+    };
+
+    const urlParams = new URLSearchParams(window.location.search);
+    shopData.shopId = urlParams.get('shop_id') || tg?.initDataUnsafe?.start_param || '';
+
+    function haptic(type = 'impact', style = 'light') {
+      try {
+        if (tg?.HapticFeedback) {
+          if (type === 'impact') tg.HapticFeedback.impactOccurred(style);
+          if (type === 'notification') tg.HapticFeedback.notificationOccurred(style);
+        }
+      } catch (e) {}
+    }
+
+    // ============================================================
+    // ROBUST API HELPER
+    // ============================================================
+    async function apiRequest(endpoint, method = 'GET', body = null) {
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-Shop-Id': shopData.shopId,
+        'X-Telegram-User-Id': String(tg?.initDataUnsafe?.user?.id || ''),
+        'X-Telegram-Init-Data': tg?.initData || ''
+      };
+      const options = { method, headers };
+      if (body) options.body = JSON.stringify(body);
+
+      const res = await fetch(endpoint, options);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Server xatosi: ${res.status}`);
+      }
+      return res.json();
+    }
+
+    // ============================================================
+    // NAVIGATION
+    // ============================================================
+    function showScreen(name) {
+      currentScreen = name;
+      haptic('impact', 'light');
+
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+
+      const scr = document.getElementById(`screen-${name}`);
+      if (scr) scr.classList.add('active');
+
+      const nav = document.getElementById(`nav-${name}`);
+      if (nav) nav.classList.add('active');
+
+      if (name === 'dashboard') loadDashboard();
+      if (name === 'customers') loadCustomers();
+      if (name === 'stats') loadStats();
+      if (name === 'add') resetForm();
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function refreshCurrentScreen() {
+      haptic('impact', 'medium');
+      showScreen(currentScreen);
+      showToast('Yangilandi', 'success');
+    }
+
+    // ============================================================
+    // DASHBOARD
+    // ============================================================
+    async function loadDashboard() {
+      try {
+        const stats = await apiRequest(`/api/stats`);
+        if (stats.shop_name) {
+          shopData.shopName = stats.shop_name;
+          shopData.shopId = stats.shop_id || shopData.shopId;
+          document.getElementById('headerShopTitle').textContent = stats.shop_name;
+          document.getElementById('shopIdText').textContent = stats.shop_id ? stats.shop_id : 'Ulangan';
+        }
+
+        document.getElementById('stat-hero-debt').textContent = formatMoney(stats.total_debt_sum);
+        document.getElementById('stat-overdue').textContent = `${stats.overdue_debts || 0} ta`;
+        document.getElementById('stat-active').textContent = `${stats.active_debts || 0} ta`;
+        document.getElementById('stat-customers').textContent = `${stats.total_customers || 0} ta`;
+        document.getElementById('stat-week').textContent = `${stats.due_this_week || 0} ta`;
+
+        const custs = await apiRequest(`/api/customers`);
+        renderRecentCustomers(custs.slice(0, 4));
+      } catch (err) {
+        document.getElementById('dashboardRecentList').innerHTML = `
+          <div class="empty-box">
+            <div class="empty-icon-wrap">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+              </svg>
+            </div>
+            <div class="empty-title">Hozircha mijozlar yo'q</div>
+            <div class="empty-sub">Birinchi qarzdor mijozni qo'shing</div>
+          </div>`;
+      }
+    }
+
+    function renderRecentCustomers(custs) {
+      const container = document.getElementById('dashboardRecentList');
+      if (!custs.length) {
+        container.innerHTML = `
+          <div class="empty-box">
+            <div class="empty-icon-wrap">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </div>
+            <div class="empty-title">Qarzlar yo'q</div>
+            <div class="empty-sub">Barcha hisob-kitoblar joyida</div>
+          </div>`;
+        return;
+      }
+      container.innerHTML = custs.map(c => renderCustomerCardHtml(c)).join('');
+    }
+
+    // ============================================================
+    // CUSTOMERS LIST
+    // ============================================================
+    async function loadCustomers() {
+      const container = document.getElementById('customersListContainer');
+      container.innerHTML = '<div class="spinner-box"><div class="spinner"></div></div>';
+
+      try {
+        allCustomers = await apiRequest(`/api/customers`);
+        renderFilteredCustomers();
+      } catch (err) {
+        container.innerHTML = `
+          <div class="empty-box">
+            <div class="empty-icon-wrap">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </div>
+            <div class="empty-title">Mijozlar topilmadi</div>
+            <div class="empty-sub">${escHtml(err.message)}</div>
+          </div>`;
+      }
+    }
+
+    function setFilter(type, btn) {
+      currentFilter = type;
+      haptic('impact', 'light');
+      document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderFilteredCustomers();
+    }
+
+    function handleSearch(query) {
+      renderFilteredCustomers(query);
+    }
+
+    function renderFilteredCustomers(searchQuery = '') {
+      const container = document.getElementById('customersListContainer');
+      const q = (searchQuery || document.getElementById('customerSearchInput')?.value || '').toLowerCase().trim();
+
+      let list = allCustomers.filter(c => {
+        const matchesQuery = !q || c.full_name.toLowerCase().includes(q) || c.phone.includes(q);
+        if (!matchesQuery) return false;
+
+        if (currentFilter === 'overdue') return (c.overdue_debts || 0) > 0;
+        if (currentFilter === 'active') return (c.total_debt || 0) > 0 && !(c.overdue_debts > 0);
+        if (currentFilter === 'paid') return (c.total_debt || 0) === 0;
+        return true;
+      });
+
+      if (!list.length) {
+        container.innerHTML = `
+          <div class="empty-box">
+            <div class="empty-icon-wrap">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </div>
+            <div class="empty-title">Hech narsa topilmadi</div>
+            <div class="empty-sub">Qidiruv mezonlariga mos mijoz yo'q</div>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = list.map(c => renderCustomerCardHtml(c)).join('');
+    }
+
+    function renderCustomerCardHtml(c) {
+      const hasOverdue = (c.overdue_debts || 0) > 0;
+      const initials = (c.full_name || 'M').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+      const hasDebt = (c.total_debt || 0) > 0;
+
+      let badge = hasOverdue 
+        ? `<span class="badge badge-overdue"><span class="badge-dot dot-danger"></span> Kechikkan</span>` 
+        : hasDebt 
+          ? `<span class="badge badge-active"><span class="badge-dot dot-warning"></span> Faol</span>` 
+          : `<span class="badge badge-paid"><span class="badge-dot dot-success"></span> Qarz yo'q</span>`;
+
+      return `
+        <div class="customer-card" onclick="openCustomerDetail(${c.id})">
+          <div class="avatar ${hasOverdue ? 'overdue-avatar' : ''}">${initials}</div>
+          <div class="customer-info">
+            <div class="customer-name">${escHtml(c.full_name)}</div>
+            <div class="customer-meta">
+              <span>${escHtml(c.phone)}</span> • ${badge}
+            </div>
+          </div>
+          <div class="customer-right">
+            <div class="customer-debt ${!hasDebt ? 'zero-debt' : ''}">${hasDebt ? formatMoney(c.total_debt) : '0 so\'m'}</div>
+            ${c.nearest_due ? `<div class="customer-due">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              ${formatDateShort(c.nearest_due)}
+            </div>` : ''}
+          </div>
+        </div>`;
+    }
+
+    // ============================================================
+    // CUSTOMER DETAIL
+    // ============================================================
+    async function openCustomerDetail(id) {
+      activeCustomerId = id;
+      showScreen('detail');
+      const container = document.getElementById('customerDetailContent');
+      container.innerHTML = '<div class="spinner-box"><div class="spinner"></div></div>';
+
+      try {
+        const data = await apiRequest(`/api/customer/${id}`);
+        const initials = (data.full_name || 'M').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+
+        const debtsHtml = data.debts && data.debts.length ? data.debts.map(d => {
+          const isOverdue = d.status === 'overdue';
+          const isPaid = d.status === 'paid';
+          let statusBadge = isPaid 
+            ? `<span class="badge badge-paid"><span class="badge-dot dot-success"></span> To'langan</span>` 
+            : isOverdue 
+              ? `<span class="badge badge-overdue"><span class="badge-dot dot-danger"></span> Kechikkan</span>` 
+              : `<span class="badge badge-active"><span class="badge-dot dot-warning"></span> Faol</span>`;
+
+          return `
+            <div class="debt-item-card ${isOverdue ? 'overdue-card' : ''}">
+              <div class="debt-header">
+                <div>
+                  <div class="debt-desc">${escHtml(d.description)}</div>
+                  <div class="debt-amount-big">${formatMoney(d.amount)}</div>
+                </div>
+                ${statusBadge}
+              </div>
+              <div class="debt-row">
+                <span>Olingan sana:</span>
+                <b>${formatDateLong(d.debt_date)}</b>
+              </div>
+              <div class="debt-row">
+                <span>To'lov muddati:</span>
+                <b style="${isOverdue ? 'color:var(--danger)' : ''}">${formatDateLong(d.due_date)}</b>
+              </div>
+              ${isPaid ? `
+                <div class="debt-row" style="color:var(--primary);margin-top:4px">
+                  <span>To'langan sana:</span>
+                  <b>${formatDateLong(d.paid_date)}</b>
+                </div>
+              ` : `
+                <button class="btn-pay" onclick="payDebtItem(${d.id}, '${escHtml(d.description)}', ${d.amount})">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  To'landi deb belgilash
+                </button>
+              `}
+            </div>`;
+        }).join('') : `
+          <div class="empty-box">
+            <div class="empty-icon-wrap">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </div>
+            <div class="empty-title">Qarzlar mavjud emas</div>
+            <div class="empty-sub">Barcha qarzlar to'langan</div>
+          </div>`;
+
+        container.innerHTML = `
+          <div style="text-align:center;padding:16px 0 20px">
+            <div class="avatar" style="width:68px;height:68px;font-size:24px;margin:0 auto 10px">${initials}</div>
+            <h3 style="font-size:20px;font-weight:800">${escHtml(data.full_name)}</h3>
+            <p style="color:var(--text-muted);font-size:14px;margin-top:2px">${escHtml(data.phone)}</p>
+            ${data.notes ? `<p style="font-size:12px;color:var(--text-light);margin-top:4px;font-style:italic">"${escHtml(data.notes)}"</p>` : ''}
+            
+            <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;margin-top:16px">
+              <div style="font-size:12px;color:var(--text-muted);font-weight:700">JAMI QARZDORLIK</div>
+              <div style="font-size:26px;font-weight:800;color:${data.total_debt > 0 ? 'var(--danger)' : 'var(--primary)'}">
+                ${formatMoney(data.total_debt)}
+              </div>
+            </div>
+          </div>
+          
+          <h4 class="section-title" style="margin-bottom:12px">Qarzlar Tarixi (${data.debts?.length || 0})</h4>
+          ${debtsHtml}
+        `;
+      } catch (err) {
+        container.innerHTML = `<div class="empty-box"><div class="empty-title">Xatolik yuz berdi</div><div class="empty-sub">${err.message}</div></div>`;
+      }
+    }
+
+    async function payDebtItem(debtId, desc, amount) {
+      if (!confirm(`"${desc}" (${formatMoney(amount)})\n\nTo'langan deb belgilansinmi?`)) return;
+      haptic('notification', 'success');
+
+      try {
+        await apiRequest(`/api/debt/${debtId}/pay`, 'POST', {
+          shop_id: shopData.shopId,
+          note: "Mini App orqali yopildi"
+        });
+        showToast("Qarz to'landi deb belgilandi", "success");
+        if (activeCustomerId) openCustomerDetail(activeCustomerId);
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    }
+
+    // ============================================================
+    // ADD FORM
+    // ============================================================
+    function resetForm() {
+      ['name', 'phone', 'amount', 'desc', 'date', 'notes'].forEach(id => {
+        const el = document.getElementById('inp-' + id);
+        if (el) { el.value = ''; el.classList.remove('error'); }
+        const err = document.getElementById('err-' + id);
+        if (err) { err.textContent = ''; err.classList.remove('show'); }
+      });
+      setQuickDays(7);
+    }
+
+    function setQuickAmount(val) {
+      const el = document.getElementById('inp-amount');
+      const cur = parseFloat(el.value) || 0;
+      el.value = cur + val;
+      haptic('impact', 'light');
+    }
+
+    function setQuickDays(days) {
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+      document.getElementById('inp-date').value = d.toISOString().split('T')[0];
+      haptic('impact', 'light');
+    }
+
+    async function submitForm() {
+      const name = document.getElementById('inp-name').value.trim();
+      const phone = document.getElementById('inp-phone').value.trim();
+      const amount = parseFloat(document.getElementById('inp-amount').value);
+      const desc = document.getElementById('inp-desc').value.trim();
+      const date = document.getElementById('inp-date').value;
+      const notes = document.getElementById('inp-notes').value.trim();
+
+      let valid = true;
+      if (!name || name.split(' ').length < 2) {
+        showFieldError('name', 'Ism va Familiyani to\'liq kiriting');
+        valid = false;
+      } else clearFieldError('name');
+
+      if (!phone || phone.replace(/[\s\-\(\)\+]/g, '').length < 9) {
+        showFieldError('phone', 'To\'g\'ri telefon raqam kiriting');
+        valid = false;
+      } else clearFieldError('phone');
+
+      if (!amount || amount < 100) {
+        showFieldError('amount', 'Summa kamida 100 so\'m bo\'lsin');
+        valid = false;
+      } else clearFieldError('amount');
+
+      if (!desc || desc.length < 2) {
+        showFieldError('desc', 'Nima olganini yozing');
+        valid = false;
+      } else clearFieldError('desc');
+
+      if (!date) {
+        showFieldError('date', 'To\'lov sanasini tanlang');
+        valid = false;
+      } else clearFieldError('date');
+
+      if (!valid) {
+        haptic('notification', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.innerHTML = 'Saqlanmoqda...';
+
+      try {
+        const payload = {
+          shop_id: shopData.shopId,
+          full_name: name,
+          phone: phone,
+          amount: amount,
+          description: desc,
+          due_date: date,
+          notes: notes || null
+        };
+        const res = await apiRequest('/api/customers/add', 'POST', payload);
+        haptic('notification', 'success');
+        showToast(res.is_new ? "Yangi mijoz saqlandi" : "Qarz qo'shildi", "success");
+        setTimeout(() => showScreen('customers'), 900);
+      } catch (err) {
+        haptic('notification', 'error');
+        showToast(err.message, "error");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Qarzni Saqlash`;
+      }
+    }
+
+    function showFieldError(f, msg) {
+      document.getElementById('inp-' + f)?.classList.add('error');
+      const err = document.getElementById('err-' + f);
+      if (err) { err.textContent = msg; err.classList.add('show'); }
+    }
+
+    function clearFieldError(f) {
+      document.getElementById('inp-' + f)?.classList.remove('error');
+      const err = document.getElementById('err-' + f);
+      if (err) { err.textContent = ''; err.classList.remove('show'); }
+    }
+
+    // ============================================================
+    // STATS
+    // ============================================================
+    async function loadStats() {
+      const container = document.getElementById('statsDetailContent');
+      container.innerHTML = '<div class="spinner-box"><div class="spinner"></div></div>';
+
+      try {
+        const stats = await apiRequest(`/api/stats`);
+        container.innerHTML = `
+          <div class="stat-card" style="margin-bottom:12px;background:var(--primary-gradient);color:white">
+            <div style="font-size:12px;opacity:0.9;font-weight:700">UMUMIY FAOL QARZ</div>
+            <div style="font-size:28px;font-weight:800;margin:6px 0">${formatMoney(stats.total_debt_sum)}</div>
+            <div style="font-size:12px;opacity:0.85">Do'konga qaytishi kerak bo'lgan jami mablag'</div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-value" style="color:var(--primary)">${formatMoney(stats.month_paid_sum)}</div>
+              <div class="stat-label">Oxirgi 30 kunda yopilgan</div>
+            </div>
+            <div class="stat-card danger-card">
+              <div class="stat-value">${stats.overdue_debts || 0} ta</div>
+              <div class="stat-label">Kechikkan qarzlar</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">${stats.active_debts || 0} ta</div>
+              <div class="stat-label">Faol qarzlar soni</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">${stats.total_customers || 0} ta</div>
+              <div class="stat-label">Jami mijozlar</div>
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        container.innerHTML = `<div class="empty-box"><div class="empty-title">Statistika yuklanmadi</div></div>`;
+      }
+    }
+
+    // ============================================================
+    // UTILS
+    // ============================================================
+    function formatMoney(n) {
+      if (!n || isNaN(n)) return "0 so'm";
+      return Math.round(n).toLocaleString('uz-UZ').replace(/,/g, ' ') + " so'm";
+    }
+
+    const months = ['yan', 'fev', 'mar', 'apr', 'may', 'iyn', 'iyl', 'avg', 'sen', 'okt', 'noy', 'dek'];
+    function formatDateShort(s) {
+      if (!s) return '';
+      try {
+        const d = new Date(s);
+        return `${d.getDate()}-${months[d.getMonth()]}`;
+      } catch (e) { return s; }
+    }
+
+    function formatDateLong(s) {
+      if (!s) return '—';
+      try {
+        const d = new Date(s);
+        return `${d.getDate()}-${months[d.getMonth()]} ${d.getFullYear()}`;
+      } catch (e) { return s; }
+    }
+
+    function escHtml(s) {
+      if (!s) return '';
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function showToast(msg, type = '') {
+      const t = document.getElementById('toastAlert');
+      if (!t) return;
+      t.textContent = msg;
+      t.className = `toast-alert toast-${type} show`;
+      setTimeout(() => t.classList.remove('show'), 2800);
+    }
+
+    // ============================================================
+    // CUSTOMER PORTAL RENDERING (FAQAT MIJOZ UCHUN)
+    // ============================================================
+    function renderCustomerPortal(data) {
+      showScreen('customer');
+      const container = document.getElementById('customerPortalContent');
+      const cust = data.customer;
+      const debts = data.debts || [];
+      
+      if (!cust) {
+        container.innerHTML = `
+          <div class="empty-box">
+            <div class="empty-title">Mijoz topilmadi</div>
+            <div class="empty-sub">Iltimos, bot orqali telefon raqamingizni tasdiqlang.</div>
+          </div>`;
+        return;
+      }
+
+      const shopNameEl = document.getElementById('shopNameDisplay');
+      if (shopNameEl) shopNameEl.textContent = cust.shop_name || "Do'kon";
+      
+      const badgeEl = document.getElementById('shopStatusBadge');
+      if (badgeEl) badgeEl.innerHTML = '<span class="status-dot"></span> Mijoz hisobi';
+
+      const activeDebts = debts.filter(d => d.status !== 'paid');
+      const paidDebts = debts.filter(d => d.status === 'paid');
+      const totalDebt = activeDebts.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+      const nearestDue = activeDebts.length ? formatDateLong(activeDebts[0].due_date) : null;
+
+      let debtsHtml = '';
+      if (activeDebts.length > 0) {
+        debtsHtml = activeDebts.map(d => {
+          const isOverdue = d.status === 'overdue';
+          return `
+            <div class="debt-item-card ${isOverdue ? 'overdue-card' : ''}" style="margin-bottom:12px">
+              <div class="debt-header">
+                <div>
+                  <div class="debt-desc">${escHtml(d.description)}</div>
+                  <div class="debt-amount-big">${formatMoney(d.amount)}</div>
+                </div>
+                <span class="badge ${isOverdue ? 'badge-overdue' : 'badge-active'}">
+                  <span class="badge-dot ${isOverdue ? 'dot-danger' : 'dot-warning'}"></span>
+                  ${isOverdue ? 'Muddati o\'tgan' : 'To\'lanishi kerak'}
+                </span>
+              </div>
+              <div class="debt-row">
+                <span>Olingan sana:</span>
+                <b>${formatDateLong(d.debt_date)}</b>
+              </div>
+              <div class="debt-row">
+                <span>To'lov sanasi:</span>
+                <b style="${isOverdue ? 'color:var(--danger)' : 'color:var(--text-main)'}">${formatDateLong(d.due_date)}</b>
+              </div>
+            </div>`;
+        }).join('');
+      } else {
+        debtsHtml = `
+          <div class="empty-box" style="padding:28px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md)">
+            <div class="empty-icon-wrap" style="color:var(--primary);margin:0 auto 12px">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="empty-title" style="color:var(--text-main);font-size:16px">Faol qarzlar mavjud emas</div>
+            <div class="empty-sub">Barcha to'lovlaringiz to'liq amalga oshirilgan</div>
+          </div>`;
+      }
+
+      let paidHtml = '';
+      if (paidDebts.length > 0) {
+        paidHtml = `
+          <h4 class="section-title" style="margin:24px 0 12px;font-size:14px;color:var(--text-muted)">To'langan qarzlar tarixi (${paidDebts.length})</h4>` +
+          paidDebts.map(d => `
+            <div class="debt-item-card" style="opacity:0.85;margin-bottom:8px">
+              <div class="debt-header">
+                <div>
+                  <div class="debt-desc">${escHtml(d.description)}</div>
+                  <div style="font-weight:700;color:var(--text-muted)">${formatMoney(d.amount)}</div>
+                </div>
+                <span class="badge badge-paid"><span class="badge-dot dot-success"></span> To'langan</span>
+              </div>
+              <div class="debt-row">
+                <span>To'langan sana:</span>
+                <b>${formatDateLong(d.paid_date)}</b>
+              </div>
+            </div>`).join('');
+      }
+
+      const shopPhone = cust.shop_phone || '';
+
+      container.innerHTML = `
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow-sm);margin-bottom:18px">
+          <div style="font-size:13px;color:var(--text-muted);font-weight:600">Assalomu alaykum,</div>
+          <div style="font-size:22px;font-weight:800;color:var(--text-main);margin-top:2px">${escHtml(cust.full_name)}</div>
+          
+          <div style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--border)">
+            <div style="font-size:11px;font-weight:700;letter-spacing:0.5px;color:var(--text-light);text-transform:uppercase">
+              Umumiy Faol Qarzingiz
+            </div>
+            <div style="font-size:32px;font-weight:800;color:${totalDebt > 0 ? 'var(--danger)' : 'var(--primary)'};margin-top:4px">
+              ${formatMoney(totalDebt)}
+            </div>
+            ${nearestDue && totalDebt > 0 ? `
+              <div style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;font-weight:600;color:var(--text-muted)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                To'lov sanasi: <b style="color:var(--text-main)">${nearestDue}</b>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+
+        <h3 class="section-title" style="margin-bottom:12px">Qarzlaringiz (${activeDebts.length})</h3>
+        ${debtsHtml}
+        ${paidHtml}
+
+        ${shopPhone ? `
+          <div style="margin-top:24px;text-align:center">
+            <a href="tel:${shopPhone}" class="btn-primary" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;width:100%;box-sizing:border-box">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              Do'kon bilan bog'lanish
+            </a>
+          </div>
+        ` : ''}
+      `;
+    }
+
+    // ============================================================
+    // AUTH & ROLE INITIALIZATION
+    // ============================================================
+    async function checkAuthAndBoot() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const paramRole = urlParams.get('role');
+      const paramCustId = urlParams.get('customer_id');
+
+      try {
+        let endpoint = '/api/me';
+        const q = [];
+        if (paramRole) q.push(`role=${encodeURIComponent(paramRole)}`);
+        if (paramCustId) q.push(`customer_id=${encodeURIComponent(paramCustId)}`);
+        if (tg?.initDataUnsafe?.user?.id) q.push(`user_id=${tg.initDataUnsafe.user.id}`);
+        if (q.length) endpoint += '?' + q.join('&');
+
+        const me = await apiRequest(endpoint);
+        if (me.role === 'customer') {
+          // FAQAT MIJOZ KO'RINISHI:
+          const nav = document.getElementById('bottomNav');
+          if (nav) nav.style.display = 'none';
+          renderCustomerPortal(me);
+        } else {
+          // ADMIN KO'RINISHI:
+          const nav = document.getElementById('bottomNav');
+          if (nav) nav.style.display = 'flex';
+          if (me.shop_id) shopData.shopId = me.shop_id;
+          if (me.admin?.shop_name) {
+            const el = document.getElementById('shopNameDisplay');
+            if (el) el.textContent = me.admin.shop_name;
+          }
+          loadDashboard();
+        }
+      } catch (err) {
+        // Fallback
+        loadDashboard();
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      checkAuthAndBoot();
+    });
+  </script>
+</body>
+</html>

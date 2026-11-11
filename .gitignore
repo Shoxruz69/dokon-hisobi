@@ -1,0 +1,33 @@
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Secrets & Environment variables
+.env
+*.env
+
+# SQLite Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Binaries & Downloads
+cloudflared.exe
+*.exe
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# Logs
+*.log
+logs/
+
+# IDE / OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
