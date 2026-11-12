@@ -26,9 +26,9 @@ async def get_pg_pool() -> asyncpg.Pool:
             db_url = "postgresql://" + db_url[len("postgres://"):]
         _pg_pool = await asyncpg.create_pool(
             db_url,
-            min_size=1,
-            max_size=10,
-            command_timeout=60,
+            min_size=3,
+            max_size=20,
+            command_timeout=30,
             statement_cache_size=0
         )
     return _pg_pool
@@ -197,6 +197,10 @@ async def init_db():
                 CREATE INDEX IF NOT EXISTS idx_debts_shop ON debts(shop_id);
                 CREATE INDEX IF NOT EXISTS idx_debts_status ON debts(status);
                 CREATE INDEX IF NOT EXISTS idx_debts_due_date ON debts(due_date);
+
+                ALTER TABLE debts ADD COLUMN IF NOT EXISTS created_by_admin_id BIGINT;
+                ALTER TABLE debts ADD COLUMN IF NOT EXISTS created_by_admin_name TEXT;
+                ALTER TABLE payment_history ADD COLUMN IF NOT EXISTS admin_name TEXT;
             """)
         logger.info("✅ Supabase / PostgreSQL ma'lumotlar bazasi tayyorlandi")
     else:

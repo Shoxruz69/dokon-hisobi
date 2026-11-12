@@ -120,3 +120,4 @@ async def notify_customer_debt_paid(
         )
 
     return await send_telegram_notification(tg_id, msg)
+

@@ -954,6 +954,119 @@
       transform: translateY(-1px);
     }
 
+    .debt-admin-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--bg-body);
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      margin-top: 8px;
+      border: 1px solid var(--border);
+    }
+    .debt-admin-tag svg {
+      color: var(--primary);
+    }
+
+    /* STATS TABS & CARDS */
+    .stats-tab-bar {
+      display: flex;
+      gap: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 4px;
+      border-radius: var(--radius-md);
+      margin-bottom: 14px;
+    }
+    .stats-tab-btn {
+      flex: 1;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      border: none;
+      background: none;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+    .stats-tab-btn.active {
+      background: var(--primary);
+      color: #ffffff;
+      box-shadow: var(--shadow-sm);
+    }
+    .stats-date-picker-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      margin-bottom: 14px;
+    }
+    .stats-date-input {
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+      outline: none;
+      cursor: pointer;
+      flex: 1;
+    }
+    .stats-kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      margin-bottom: 10px;
+      box-shadow: var(--shadow-sm);
+    }
+    .stats-kpi-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .stats-kpi-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .stats-kpi-amount {
+      font-size: 22px;
+      font-weight: 800;
+      margin-top: 4px;
+    }
+    .stats-kpi-sub {
+      font-size: 12px;
+      color: var(--text-light);
+      margin-top: 2px;
+    }
+    .tx-badge-given {
+      background: #fee2e2;
+      color: #dc2626;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 7px;
+      border-radius: 6px;
+    }
+    .tx-badge-paid {
+      background: #dcfce7;
+      color: #15803d;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 7px;
+      border-radius: 6px;
+    }
+
     .custom-modal-backdrop {
       position: fixed;
       inset: 0;
@@ -1428,8 +1541,9 @@
     async function apiRequest(endpoint, method = 'GET', body = null) {
       const headers = {
         'Content-Type': 'application/json',
-        'X-Shop-Id': shopData.shopId,
+        'X-Shop-Id': shopData.shopId || '5832B1F2',
         'X-Telegram-User-Id': String(tg?.initDataUnsafe?.user?.id || ''),
+        'X-Admin-Name': String(tg?.initDataUnsafe?.user?.first_name || tg?.initDataUnsafe?.user?.username || ''),
         'X-Telegram-Init-Data': tg?.initData || ''
       };
       const options = { method, headers };
@@ -1474,16 +1588,22 @@
     }
 
     // ============================================================
-    // DASHBOARD
+    // DASHBOARD (PARALLEL & TEZKOR YUKLASH)
     // ============================================================
     async function loadDashboard() {
       try {
-        const stats = await apiRequest(`/api/stats`);
+        const [stats, custs] = await Promise.all([
+          apiRequest(`/api/stats`),
+          apiRequest(`/api/customers`)
+        ]);
+
         if (stats.shop_name) {
           shopData.shopName = stats.shop_name;
-          shopData.shopId = stats.shop_id || shopData.shopId;
-          document.getElementById('headerShopTitle').textContent = stats.shop_name;
-          document.getElementById('shopIdText').textContent = stats.shop_id ? stats.shop_id : 'Ulangan';
+          shopData.shopId = stats.shop_id || shopData.shopId || '5832B1F2';
+          const titleEl = document.getElementById('headerShopTitle');
+          if (titleEl) titleEl.textContent = stats.shop_name;
+          const idEl = document.getElementById('shopIdText');
+          if (idEl) idEl.textContent = stats.shop_id ? stats.shop_id : 'Ulangan';
         }
 
         document.getElementById('stat-hero-debt').textContent = formatMoney(stats.total_debt_sum);
@@ -1492,8 +1612,7 @@
         document.getElementById('stat-customers').textContent = `${stats.total_customers || 0} ta`;
         document.getElementById('stat-week').textContent = `${stats.due_this_week || 0} ta`;
 
-        const custs = await apiRequest(`/api/customers`);
-        renderRecentCustomers(custs.slice(0, 4));
+        renderRecentCustomers(custs.slice(0, 5));
       } catch (err) {
         document.getElementById('dashboardRecentList').innerHTML = `
           <div class="empty-box">
@@ -1645,6 +1764,13 @@
               ? `<span class="badge badge-overdue"><span class="badge-dot dot-danger"></span> Kechikkan</span>` 
               : `<span class="badge badge-active"><span class="badge-dot dot-warning"></span> Faol</span>`;
 
+          const adminTag = (d.created_by_admin_name || d.created_by_admin_id) ? `
+            <div class="debt-admin-tag">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <span>Qo'shgan admin: <b>${escHtml(d.created_by_admin_name || ('Admin ' + d.created_by_admin_id))}</b></span>
+            </div>
+          ` : '';
+
           return `
             <div class="debt-item-card ${isOverdue ? 'overdue-card' : ''}">
               <div class="debt-header">
@@ -1673,6 +1799,7 @@
                   To'landi deb belgilash
                 </button>
               `}
+              ${adminTag}
             </div>`;
         }).join('') : `
           <div class="empty-box">
@@ -1684,6 +1811,27 @@
             <div class="empty-title">Qarzlar mavjud emas</div>
             <div class="empty-sub">Barcha qarzlar to'langan</div>
           </div>`;
+
+        const paymentsHtml = data.payments && data.payments.length ? `
+          <h4 class="section-title" style="margin:24px 0 12px">To'lovlar Tarixi (${data.payments.length})</h4>
+          ${data.payments.map(p => `
+            <div class="debt-item-card" style="border-left:4px solid var(--primary)">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:16px;font-weight:800;color:var(--primary)">+${formatMoney(p.amount)}</span>
+                <span style="font-size:12px;color:var(--text-muted)">${formatDateLong(p.paid_at)}</span>
+              </div>
+              <div style="font-size:13px;color:var(--text-muted);margin-top:4px">
+                Izoh: <b>${escHtml(p.note || 'To\'lov')}</b>
+              </div>
+              ${p.admin_name ? `
+                <div class="debt-admin-tag">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  <span>Qabul qilgan: <b>${escHtml(p.admin_name)}</b></span>
+                </div>
+              ` : ''}
+            </div>
+          `).join('')}
+        ` : '';
 
         container.innerHTML = `
           <div style="text-align:center;padding:16px 0 20px">
@@ -1720,6 +1868,7 @@
           
           <h4 class="section-title" style="margin-bottom:12px">Qarzlar Tarixi (${data.debts?.length || 0})</h4>
           ${debtsHtml}
+          ${paymentsHtml}
         `;
       } catch (err) {
         container.innerHTML = `<div class="empty-box"><div class="empty-title">Xatolik yuz berdi</div><div class="empty-sub">${err.message}</div></div>`;
@@ -2008,7 +2157,8 @@
         const res = await apiRequest('/api/customers/add', 'POST', payload);
         haptic('notification', 'success');
         showToast(res.is_new ? "Yangi mijoz saqlandi" : "Qarz qo'shildi", "success");
-        setTimeout(() => showScreen('customers'), 900);
+        resetForm();
+        showScreen('customers');
       } catch (err) {
         haptic('notification', 'error');
         showToast(err.message, "error");
@@ -2035,43 +2185,274 @@
     }
 
     // ============================================================
-    // STATS
+    // STATS (BUGUN, SHU OY VA SANA TANLASH)
     // ============================================================
-    async function loadStats() {
+    let statsPeriod = 'today'; // 'today' | 'month' | 'custom'
+    let statsSelectedDate = getLocalDateString();
+    let cachedStats = null;
+
+    function getLocalDateString(d = new Date()) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    async function loadStats(targetDate = null) {
       const container = document.getElementById('statsDetailContent');
+      if (!targetDate) {
+        if (statsPeriod === 'today') {
+          targetDate = getLocalDateString();
+          statsSelectedDate = targetDate;
+        } else if (statsPeriod === 'custom') {
+          targetDate = statsSelectedDate || getLocalDateString();
+        }
+      } else {
+        statsSelectedDate = targetDate;
+      }
+
       container.innerHTML = '<div class="spinner-box"><div class="spinner"></div></div>';
 
       try {
-        const stats = await apiRequest(`/api/stats`);
+        const url = targetDate ? `/api/stats?date=${targetDate}` : `/api/stats`;
+        const stats = await apiRequest(url);
+        cachedStats = stats;
+        renderStatsView(stats);
+      } catch (err) {
         container.innerHTML = `
-          <div class="stat-card" style="margin-bottom:12px;background:var(--primary-gradient);color:white">
-            <div style="font-size:12px;opacity:0.9;font-weight:700">UMUMIY FAOL QARZ</div>
-            <div style="font-size:28px;font-weight:800;margin:6px 0">${formatMoney(stats.total_debt_sum)}</div>
-            <div style="font-size:12px;opacity:0.85">Do'konga qaytishi kerak bo'lgan jami mablag'</div>
+          <div class="empty-box">
+            <div class="empty-title">Statistika yuklanmadi</div>
+            <div class="empty-sub">${escHtml(err.message)}</div>
+          </div>`;
+      }
+    }
+
+    function switchStatsPeriod(period) {
+      statsPeriod = period;
+      haptic('impact', 'light');
+      if (period === 'today') {
+        statsSelectedDate = getLocalDateString();
+        loadStats(statsSelectedDate);
+      } else if (period === 'month') {
+        if (cachedStats) {
+          renderStatsView(cachedStats);
+        } else {
+          loadStats();
+        }
+      } else if (period === 'custom') {
+        if (!statsSelectedDate) statsSelectedDate = getLocalDateString();
+        loadStats(statsSelectedDate);
+      }
+    }
+
+    function onStatsDateChange(newDate) {
+      if (!newDate) return;
+      statsSelectedDate = newDate;
+      haptic('impact', 'medium');
+      loadStats(newDate);
+    }
+
+    function renderStatsView(stats) {
+      const container = document.getElementById('statsDetailContent');
+      if (!container || !stats) return;
+
+      const daily = stats.daily || {};
+      const monthly = stats.monthly || {};
+      const overall = stats.overall || stats;
+
+      // Tab navigatsiya
+      const tabBarHtml = `
+        <div class="stats-tab-bar">
+          <button class="stats-tab-btn ${statsPeriod === 'today' ? 'active' : ''}" onclick="switchStatsPeriod('today')">Bugun</button>
+          <button class="stats-tab-btn ${statsPeriod === 'month' ? 'active' : ''}" onclick="switchStatsPeriod('month')">Shu oy</button>
+          <button class="stats-tab-btn ${statsPeriod === 'custom' ? 'active' : ''}" onclick="switchStatsPeriod('custom')">Sana tanlash</button>
+        </div>
+      `;
+
+      let datePickerHtml = '';
+      if (statsPeriod === 'custom') {
+        datePickerHtml = `
+          <div class="stats-date-picker-wrap">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-muted)">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            <input type="date" class="stats-date-input" value="${statsSelectedDate}" onchange="onStatsDateChange(this.value)">
+          </div>
+        `;
+      }
+
+      let contentHtml = '';
+
+      if (statsPeriod === 'today' || statsPeriod === 'custom') {
+        const isToday = stats.is_today || (statsSelectedDate === getLocalDateString());
+        const dateTitle = isToday ? 'Bugungi Hisobot' : `${formatDateLong(statsSelectedDate)} hisoboti`;
+        const netFlow = daily.net_flow || 0;
+        const netPositive = netFlow >= 0;
+
+        const givenList = daily.given_list || [];
+        const paidList = daily.paid_list || [];
+
+        contentHtml = `
+          <div style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px">
+            ${dateTitle}
           </div>
 
+          <!-- KPI 1: Berilgan qarzlar -->
+          <div class="stats-kpi-card" style="border-left:4px solid var(--danger)">
+            <div class="stats-kpi-row">
+              <span class="stats-kpi-title" style="color:var(--danger)">Berilgan qarz</span>
+              <span class="tx-badge-given">${daily.given_debts_count || 0} ta qarz</span>
+            </div>
+            <div class="stats-kpi-amount" style="color:var(--danger)">-${formatMoney(daily.given_total_sum || 0)}</div>
+            <div class="stats-kpi-sub">
+              👤 <b>${daily.given_customers_count || 0} ta</b> odamga qarz berildi
+            </div>
+          </div>
+
+          <!-- KPI 2: Undirilgan to'lovlar -->
+          <div class="stats-kpi-card" style="border-left:4px solid var(--primary)">
+            <div class="stats-kpi-row">
+              <span class="stats-kpi-title" style="color:var(--primary)">Undirilgan to'lov</span>
+              <span class="tx-badge-paid">${daily.collected_payments_count || 0} ta to'lov</span>
+            </div>
+            <div class="stats-kpi-amount" style="color:var(--primary)">+${formatMoney(daily.collected_total_sum || 0)}</div>
+            <div class="stats-kpi-sub">
+              💰 <b>${daily.collected_customers_count || 0} ta</b> odamdan to'lov qabul qilindi
+            </div>
+          </div>
+
+          <!-- KPI 3: Kassa sof aylanmasi -->
+          <div class="stats-kpi-card" style="border-left:4px solid ${netPositive ? 'var(--primary)' : 'var(--warning)'}">
+            <div class="stats-kpi-title">Kassa sof aylanmasi (Kirim - Qarz)</div>
+            <div class="stats-kpi-amount" style="color:${netPositive ? 'var(--primary)' : 'var(--danger)'}">
+              ${netPositive ? '+' : ''}${formatMoney(netFlow)}
+            </div>
+            <div class="stats-kpi-sub">
+              ${netPositive ? 'Kassaga sof naqd pul kirimi bo\'ldi' : 'Berilgan qarz undirilgan to\'lovdan ko\'proq bo\'ldi'}
+            </div>
+          </div>
+
+          <!-- BERILGAN QARZLAR JURNALI -->
+          <h4 class="section-title" style="margin:20px 0 10px;font-size:14px">
+            Berilgan qarzlar ro'yxati (${givenList.length})
+          </h4>
+          ${givenList.length ? givenList.map(item => `
+            <div class="debt-item-card" style="margin-bottom:8px">
+              <div class="debt-header">
+                <div>
+                  <div class="debt-desc">${escHtml(item.customer_name)} <span style="font-weight:400;color:var(--text-muted);font-size:12px">(${escHtml(item.customer_phone || '')})</span></div>
+                  <div class="debt-amount-big" style="color:var(--danger)">-${formatMoney(item.amount)}</div>
+                </div>
+                <span class="tx-badge-given">Qarz berildi</span>
+              </div>
+              ${item.description ? `<div class="debt-row"><span>Tavsif:</span><b>${escHtml(item.description)}</b></div>` : ''}
+              <div class="debt-admin-tag">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span>Qo'shgan admin: <b>${escHtml(item.admin_name || 'Admin')}</b></span>
+              </div>
+            </div>
+          `).join('') : `
+            <div class="empty-box" style="padding:16px 12px;margin-bottom:12px">
+              <div class="empty-sub">Bu kunda qarz berilmagan</div>
+            </div>
+          `}
+
+          <!-- UNDIRILGAN TO'LOVLAR JURNALI -->
+          <h4 class="section-title" style="margin:20px 0 10px;font-size:14px">
+            Undirilgan to'lovlar ro'yxati (${paidList.length})
+          </h4>
+          ${paidList.length ? paidList.map(item => `
+            <div class="debt-item-card" style="margin-bottom:8px;border-left:4px solid var(--primary)">
+              <div class="debt-header">
+                <div>
+                  <div class="debt-desc">${escHtml(item.customer_name)} <span style="font-weight:400;color:var(--text-muted);font-size:12px">(${escHtml(item.customer_phone || '')})</span></div>
+                  <div class="debt-amount-big" style="color:var(--primary)">+${formatMoney(item.amount)}</div>
+                </div>
+                <span class="tx-badge-paid">To'lov</span>
+              </div>
+              ${item.note ? `<div class="debt-row"><span>Izoh:</span><b>${escHtml(item.note)}</b></div>` : ''}
+              <div class="debt-admin-tag" style="background:#e0f2fe;color:#0369a1;border-color:#bae6fd">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span>Qabul qilgan: <b>${escHtml(item.admin_name || 'Admin')}</b></span>
+              </div>
+            </div>
+          `).join('') : `
+            <div class="empty-box" style="padding:16px 12px;margin-bottom:12px">
+              <div class="empty-sub">Bu kunda to'lov undirilmagan</div>
+            </div>
+          `}
+        `;
+      } else if (statsPeriod === 'month') {
+        const netFlow = monthly.net_flow || 0;
+        const netPositive = netFlow >= 0;
+
+        contentHtml = `
+          <div style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px">
+            Shu Oylik Hisobot
+          </div>
+
+          <!-- KPI 1: Oylik berilgan qarz -->
+          <div class="stats-kpi-card" style="border-left:4px solid var(--danger)">
+            <div class="stats-kpi-row">
+              <span class="stats-kpi-title" style="color:var(--danger)">Shu oyda berilgan qarz</span>
+              <span class="tx-badge-given">${monthly.given_debts_count || 0} ta qarz</span>
+            </div>
+            <div class="stats-kpi-amount" style="color:var(--danger)">-${formatMoney(monthly.given_total_sum || 0)}</div>
+            <div class="stats-kpi-sub">
+              👤 <b>${monthly.given_customers_count || 0} ta</b> mijozga berildi
+            </div>
+          </div>
+
+          <!-- KPI 2: Oylik undirilgan qarz -->
+          <div class="stats-kpi-card" style="border-left:4px solid var(--primary)">
+            <div class="stats-kpi-row">
+              <span class="stats-kpi-title" style="color:var(--primary)">Shu oyda undirilgan to'lov</span>
+              <span class="tx-badge-paid">${monthly.collected_payments_count || 0} ta to'lov</span>
+            </div>
+            <div class="stats-kpi-amount" style="color:var(--primary)">+${formatMoney(monthly.collected_total_sum || 0)}</div>
+            <div class="stats-kpi-sub">
+              💰 <b>${monthly.collected_customers_count || 0} ta</b> mijozdan qabul qilindi
+            </div>
+          </div>
+
+          <!-- KPI 3: Oylik sof kirim -->
+          <div class="stats-kpi-card" style="border-left:4px solid ${netPositive ? 'var(--primary)' : 'var(--warning)'}">
+            <div class="stats-kpi-title">Shu oy sof kassa aylanmasi</div>
+            <div class="stats-kpi-amount" style="color:${netPositive ? 'var(--primary)' : 'var(--danger)'}">
+              ${netPositive ? '+' : ''}${formatMoney(netFlow)}
+            </div>
+            <div class="stats-kpi-sub">
+              ${netPositive ? 'Kassaga qarzdan ko\'p naqd pul kirdi' : 'Qarz berish to\'lovlardan oshib ketdi'}
+            </div>
+          </div>
+
+          <!-- UMUMIY DO'KON KO'RSATKICHLARI -->
+          <h4 class="section-title" style="margin:20px 0 10px;font-size:14px">Umumiy Do'kon Ko'rsatkichlari</h4>
           <div class="stats-grid">
-            <div class="stat-card">
-              <div class="stat-value" style="color:var(--primary)">${formatMoney(stats.month_paid_sum)}</div>
-              <div class="stat-label">Oxirgi 30 kunda yopilgan</div>
+            <div class="stat-card" style="border-top:3px solid var(--primary)">
+              <div class="stat-value" style="color:var(--primary);font-size:18px">${formatMoney(overall.total_debt_sum || 0)}</div>
+              <div class="stat-label">Jami faol qarz</div>
             </div>
             <div class="stat-card danger-card">
-              <div class="stat-value">${stats.overdue_debts || 0} ta</div>
+              <div class="stat-value">${overall.overdue_debts || 0} ta</div>
               <div class="stat-label">Kechikkan qarzlar</div>
             </div>
             <div class="stat-card">
-              <div class="stat-value">${stats.active_debts || 0} ta</div>
+              <div class="stat-value">${overall.active_debts || 0} ta</div>
               <div class="stat-label">Faol qarzlar soni</div>
             </div>
             <div class="stat-card">
-              <div class="stat-value">${stats.total_customers || 0} ta</div>
+              <div class="stat-value">${overall.total_customers || 0} ta</div>
               <div class="stat-label">Jami mijozlar</div>
             </div>
           </div>
         `;
-      } catch (err) {
-        container.innerHTML = `<div class="empty-box"><div class="empty-title">Statistika yuklanmadi</div></div>`;
       }
+
+      container.innerHTML = tabBarHtml + datePickerHtml + contentHtml;
     }
 
     // ============================================================

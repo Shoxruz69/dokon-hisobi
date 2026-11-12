@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Optional, Any, Dict, List
 from pathlib import Path
 from aiohttp import web
 from config import settings
@@ -46,8 +47,11 @@ async def cors_middleware(request: web.Request, handler):
 # ============================================================
 # SHOP RESOLVER HELPER
 # ============================================================
+_cached_default_shop_id: Optional[str] = "5832B1F2"
+
 async def resolve_shop_id(request: web.Request) -> str:
-    """Har qanday manbadan do'kon kodini aniqlash"""
+    """Har qanday manbadan do'kon kodini tezkor aniqlash (keshlangan)"""
+    global _cached_default_shop_id
     # 1. URL yo'li ({shop_id})
     shop_id = request.match_info.get("shop_id", "").strip().upper()
     if shop_id:
@@ -60,19 +64,14 @@ async def resolve_shop_id(request: web.Request) -> str:
     shop_id = request.headers.get("X-Shop-Id", "").strip().upper()
     if shop_id:
         return shop_id
-    # 4. Telegram user ID (X-Telegram-User-Id yoki ?user_id=)
-    user_id_str = request.headers.get("X-Telegram-User-Id") or request.query.get("user_id")
-    if user_id_str:
-        try:
-            admin = await get_admin_by_telegram_id(int(user_id_str))
-            if admin:
-                return admin["shop_id"]
-        except Exception:
-            pass
+    # 4. Keshdagi default do'kon kodi (0ms)
+    if _cached_default_shop_id:
+        return _cached_default_shop_id
     # 5. Tizimdagi birinchi faol admin do'koni (fallback)
     first_admin = await get_first_active_admin()
     if first_admin:
-        return first_admin["shop_id"]
+        _cached_default_shop_id = first_admin["shop_id"]
+        return _cached_default_shop_id
     return ""
 
 # ============================================================
@@ -80,7 +79,7 @@ async def resolve_shop_id(request: web.Request) -> str:
 # ============================================================
 
 async def handle_get_stats(request: web.Request):
-    """GET /api/stats yoki /api/stats/{shop_id}"""
+    """GET /api/stats yoki /api/stats/{shop_id}?date=YYYY-MM-DD"""
     shop_id = await resolve_shop_id(request)
     if not shop_id:
         return web.json_response({"detail": "Do'kon topilmadi"}, status=404)
@@ -89,7 +88,8 @@ async def handle_get_stats(request: web.Request):
     if not admin:
         return web.json_response({"detail": "Do'kon topilmadi"}, status=404)
         
-    stats = await get_admin_stats(shop_id)
+    target_date = request.query.get("date")
+    stats = await get_admin_stats(shop_id, target_date=target_date)
     stats["shop_name"] = admin["shop_name"]
     stats["shop_id"] = admin["shop_id"]
     return web.json_response(stats)
@@ -164,6 +164,10 @@ async def handle_add_customer(request: web.Request):
     if len(description) < 2:
         return web.json_response({"detail": "Nima olinganini yozing"}, status=400)
 
+    admin_id_val = request.headers.get("X-Telegram-User-Id") or data.get("admin_id")
+    admin_name_val = request.headers.get("X-Admin-Name") or data.get("admin_name")
+    admin_id = int(admin_id_val) if admin_id_val and str(admin_id_val).isdigit() else 0
+
     result = await add_customer(
         shop_id=shop_id,
         full_name=name_val,
@@ -171,7 +175,9 @@ async def handle_add_customer(request: web.Request):
         amount=amt_val,
         description=description,
         due_date=date_val,
-        notes=notes
+        notes=notes,
+        admin_id=admin_id,
+        admin_name=admin_name_val
     )
     return web.json_response(result)
 
@@ -188,34 +194,33 @@ async def handle_mark_paid(request: web.Request):
         data = {}
         
     shop_id = data.get("shop_id") or request.headers.get("X-Shop-Id", "").strip().upper()
-    admin_id = data.get("admin_id", 0)
+    admin_id_val = request.headers.get("X-Telegram-User-Id") or data.get("admin_id")
+    admin_name_val = request.headers.get("X-Admin-Name") or data.get("admin_name")
+    admin_id = int(admin_id_val) if admin_id_val and str(admin_id_val).isdigit() else 0
     note = data.get("note", "Mini App orqali to'landi")
     
     if not shop_id:
         return web.json_response({"detail": "shop_id ko'rsatilmadi"}, status=400)
         
-    res = await mark_debt_paid(debt_id, shop_id, admin_id, note)
+    res = await mark_debt_paid(debt_id, shop_id, admin_id, note, admin_name=admin_name_val)
     if not res:
         return web.json_response({"detail": "Qarz topilmadi yoki do'kon mos kelmadi"}, status=400)
 
-    # Mijozga bildirishnoma yuborish
-    notified = False
-    try:
-        notified = await notify_customer_debt_paid(
-            customer=res["customer"],
-            shop_name=res["shop_name"],
-            debt_amount=res["paid_amount"],
-            description=res["debt"]["description"],
-            remaining_debt=res["remaining_debt"]
-        )
-    except Exception as e:
-        logger.warning(f"Telegram bildirishnoma xatosi: {e}")
+    # Bildirishnomani fonda yuboramiz (foydalanuvchi kutib turmaydi, tez ishlaydi)
+    import asyncio
+    asyncio.create_task(notify_customer_debt_paid(
+        customer=res["customer"],
+        shop_name=res["shop_name"],
+        debt_amount=res["paid_amount"],
+        description=res["debt"]["description"],
+        remaining_debt=res["remaining_debt"]
+    ))
         
     return web.json_response({
         "success": True,
         "paid_amount": res["paid_amount"],
         "remaining_debt": res["remaining_debt"],
-        "notified": notified
+        "admin_name": res.get("admin_name")
     })
 
 async def handle_customer_pay(request: web.Request):
@@ -243,30 +248,29 @@ async def handle_customer_pay(request: web.Request):
         return web.json_response({"detail": "To'lov summasi noto'g'ri"}, status=400)
 
     note = data.get("note", "Mini App orqali to'landi")
-    admin_id = data.get("admin_id", 0)
+    admin_id_val = request.headers.get("X-Telegram-User-Id") or data.get("admin_id")
+    admin_name_val = request.headers.get("X-Admin-Name") or data.get("admin_name")
+    admin_id = int(admin_id_val) if admin_id_val and str(admin_id_val).isdigit() else 0
 
     try:
-        result = await record_customer_payment(customer_id, shop_id, amount, admin_id, note)
+        result = await record_customer_payment(customer_id, shop_id, amount, admin_id, note, admin_name=admin_name_val)
     except ValueError as e:
         return web.json_response({"detail": str(e)}, status=400)
 
-    # Mijozga Telegram orqali bildirishnoma (SMS) yuborish
-    notified = False
-    try:
-        notified = await notify_customer_partial_payment(
-            customer=result["customer"],
-            shop_name=result["shop_name"],
-            paid_amount=result["paid_amount"],
-            remaining_debt=result["remaining_debt"]
-        )
-    except Exception as e:
-        logger.warning(f"Telegram bildirishnoma xatosi: {e}")
+    # Bildirishnomani fonda yuborish
+    import asyncio
+    asyncio.create_task(notify_customer_partial_payment(
+        customer=result["customer"],
+        shop_name=result["shop_name"],
+        paid_amount=result["paid_amount"],
+        remaining_debt=result["remaining_debt"]
+    ))
 
     return web.json_response({
         "success": True,
         "paid_amount": result["paid_amount"],
         "remaining_debt": result["remaining_debt"],
-        "notified": notified
+        "admin_name": result.get("admin_name")
     })
 
 async def handle_customer_add_debt(request: web.Request):
@@ -301,30 +305,31 @@ async def handle_customer_add_debt(request: web.Request):
     if not is_date_ok:
         return web.json_response({"detail": date_val}, status=400)
 
+    admin_id_val = request.headers.get("X-Telegram-User-Id") or data.get("admin_id")
+    admin_name_val = request.headers.get("X-Admin-Name") or data.get("admin_name")
+    admin_id = int(admin_id_val) if admin_id_val and str(admin_id_val).isdigit() else 0
+
     try:
-        result = await add_debt_to_existing_customer(customer_id, shop_id, amt_val, description, date_val, notes)
+        result = await add_debt_to_existing_customer(customer_id, shop_id, amt_val, description, date_val, notes, admin_id=admin_id, admin_name=admin_name_val)
     except ValueError as e:
         return web.json_response({"detail": str(e)}, status=400)
 
-    # Mijozga Telegram orqali bildirishnoma (SMS) yuborish
-    notified = False
-    try:
-        notified = await notify_customer_debt_added(
-            customer=result["customer"],
-            shop_name=result["shop_name"],
-            amount=result["amount"],
-            description=result["description"],
-            due_date=result["due_date"],
-            total_debt=result["total_debt"]
-        )
-    except Exception as e:
-        logger.warning(f"Telegram bildirishnoma xatosi: {e}")
+    # Bildirishnomani fonda yuborish
+    import asyncio
+    asyncio.create_task(notify_customer_debt_added(
+        customer=result["customer"],
+        shop_name=result["shop_name"],
+        amount=result["amount"],
+        description=result["description"],
+        due_date=result["due_date"],
+        total_debt=result["total_debt"]
+    ))
 
     return web.json_response({
         "success": True,
         "debt_id": result["debt_id"],
         "total_debt": result["total_debt"],
-        "notified": notified
+        "admin_name": result.get("created_by_admin_name")
     })
 
 async def handle_get_me(request: web.Request):

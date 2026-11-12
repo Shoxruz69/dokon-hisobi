@@ -12,7 +12,7 @@ services:
       - key: DATABASE_URL
         value: "postgresql://postgres.paurqmioymjjqsollezd:Shoxruz2010!@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres"
       - key: ADMIN_TELEGRAM_ID
-        value: "6876312568"
+        value: "264625389,6715367177,6876312568"
       - key: MINI_APP_URL
         value: "https://dokon-hisobi.onrender.com"
       - key: ADMIN_SECRET_CODE
