@@ -15,8 +15,10 @@ from aiogram.fsm.state import State, StatesGroup
 import aiosqlite
 
 from config import settings
+from database.db import db_execute
 from database.queries import (
     get_admin_by_telegram_id,
+    get_first_active_admin,
     update_admin_profile,
     update_admin_shop_name,
     get_customer_by_telegram_id,
@@ -54,49 +56,60 @@ async def cmd_start(message: Message, state: FSMContext, admin: dict = None):
     await state.clear()
     user_id = message.from_user.id
     
-    # 1. ADMIN TEKSHIRUVI
-    if not admin:
-        admin = await get_admin_by_telegram_id(user_id)
-        
     is_env_admin = False
     try:
         is_env_admin = (int(user_id) == int(settings.ADMIN_TELEGRAM_ID))
     except Exception:
         pass
-        
-    # Agar foydalanuvchi tizim administratori bo'lsa
+
+    # 1. ADMIN TEKSHIRUVI
+    if not admin:
+        admin = await get_admin_by_telegram_id(user_id)
+
+    # Agar telegram_id bo'yicha topilmasa, lekin tizim egasi bo'lsa yoki bazada mavjud do'kon bo'lsa
+    if not admin and is_env_admin:
+        admin = await get_first_active_admin()
+        if admin and admin.get("telegram_id") != user_id:
+            try:
+                await db_execute("UPDATE admins SET telegram_id = ? WHERE id = ?", user_id, admin["id"])
+                admin["telegram_id"] = user_id
+            except Exception:
+                pass
+
+    # Agar foydalanuvchi tizim administratori bo'lsa yoki admin topilsa
     if is_env_admin or admin:
-        # Agar admin do'kon nomini hali to'ldirmagan bo'lsa -> To'ldirishni so'raymiz
-        if not admin or not admin.get("shop_name"):
+        # Agar bazada allaqachon do'kon yaratilgan bo'lsa -> HECH QACHON qayta ro'yxatdan o'tishni so'ramaymiz!
+        if admin and admin.get("shop_name"):
+            shop_name = admin.get("shop_name", "Do'kon")
+            shop_id = admin.get("shop_id", "")
+            admin_name = admin.get("full_name") or message.from_user.full_name
+            
             await message.answer(
-                f"Assalomu alaykum, <b>{esc(message.from_user.full_name)}</b>! 👋\n\n"
-                "Siz <b>Do'kon Administratiori</b> (do'kon egasi) sifatida tasdiqlandingiz.\n"
-                "Barcha boshqaruv huquqlari sizga beriladi.\n\n"
-                "🏪 Iltimos, <b>do'koningiz nomini yozing</b> (masalan: <i>Orom Market</i> yoki <i>Baraka Savdo</i>):",
+                f"Assalomu alaykum, <b>{esc(admin_name)}</b>!\n\n"
+                f"🏪 Do'kon: <b>{esc(shop_name)}</b>\n"
+                f"🆔 Do'kon kodi: <code>{shop_id}</code>\n\n"
+                f"Qarzlarni boshqarish, yangi mijoz kiritish va hisobotlarni ko'rish uchun "
+                f"pastdagi <b>Do'kon Paneli</b> tugmasini bosing:\n\n"
+                f"<i>✏️ Do'kon nomini o'zgartirish uchun: /nomini_ozgartirish</i>",
                 parse_mode="HTML",
-                reply_markup=ReplyKeyboardRemove()
+                reply_markup=get_admin_main_inline_kb(shop_id)
             )
-            await state.set_state(AdminSetup.waiting_for_shop_name)
+            await message.answer(
+                "👇 Mini App menyusi faol:",
+                reply_markup=get_admin_reply_kb(shop_id)
+            )
             return
 
-        # Agar allaqachon do'kon nomi to'ldirilgan bo'lsa -> To'g'ridan-to'g'ri boshqaruv paneli
-        shop_name = admin.get("shop_name", "Do'kon")
-        shop_id = admin.get("shop_id", "")
-        
+        # Faqat bazada umuman do'kon bo'lmagandagina bir marta ro'yxatdan o'tishni boshlaymiz
         await message.answer(
-            f"Assalomu alaykum, <b>{esc(admin['full_name'])}</b>!\n\n"
-            f"🏪 Do'kon: <b>{esc(shop_name)}</b>\n"
-            f"🆔 Do'kon kodi: <code>{shop_id}</code>\n\n"
-            f"Qarzlarni boshqarish, yangi mijoz kiritish va hisobotlarni ko'rish uchun "
-            f"pastdagi <b>Do'kon Paneli</b> tugmasini bosing:\n\n"
-            f"<i>✏️ Do'kon nomini o'zgartirish uchun: /nomini_ozgartirish</i>",
+            f"Assalomu alaykum, <b>{esc(message.from_user.full_name)}</b>! 👋\n\n"
+            "Siz <b>Do'kon Administratiori</b> (do'kon egasi) sifatida tasdiqlandingiz.\n"
+            "Barcha boshqaruv huquqlari sizga beriladi.\n\n"
+            "🏪 Iltimos, <b>do'koningiz nomini yozing</b> (masalan: <i>Shox market</i> yoki <i>Baraka Savdo</i>):",
             parse_mode="HTML",
-            reply_markup=get_admin_main_inline_kb(shop_id)
+            reply_markup=ReplyKeyboardRemove()
         )
-        await message.answer(
-            "👇 Mini App menyusi faol:",
-            reply_markup=get_admin_reply_kb(shop_id)
-        )
+        await state.set_state(AdminSetup.waiting_for_shop_name)
         return
 
     # 2. MIJOZ TEKSHIRUVI (Agar avval raqamini tasdiqlagan bo'lsa)
@@ -226,6 +239,8 @@ async def process_admin_phone(message: Message, state: FSMContext):
 async def cmd_edit_shop(message: Message, state: FSMContext):
     user_id = message.from_user.id
     admin = await get_admin_by_telegram_id(user_id)
+    if not admin and str(user_id) == str(settings.ADMIN_TELEGRAM_ID):
+        admin = await get_first_active_admin()
     if not admin:
         await message.answer("Sizda do'kon boshqaruviga ruxsat yo'q.")
         return
@@ -245,16 +260,19 @@ async def process_new_shop_name(message: Message, state: FSMContext):
         return
         
     user_id = message.from_user.id
-    await update_admin_shop_name(user_id, new_name)
-    admin = await get_admin_by_telegram_id(user_id)
+    admin = await get_admin_by_telegram_id(user_id) or await get_first_active_admin()
+    if admin:
+        await update_admin_shop_name(admin.get("telegram_id", user_id), new_name)
+        admin = await get_admin_by_telegram_id(admin.get("telegram_id", user_id)) or admin
+        admin["shop_name"] = new_name
     await state.clear()
     
     await message.answer(
         f"✅ <b>Do'kon nomi yangilandi!</b>\n\n"
         f"🏪 Yangi nom: <b>{esc(new_name)}</b>\n\n"
-        f"Do'kon boshqaruviga kirish uchun:",
+        f"Do'kon boshqaruviga kirish uchun pastdagi tugmani bosing:",
         parse_mode="HTML",
-        reply_markup=get_admin_main_inline_kb(admin["shop_id"])
+        reply_markup=get_admin_main_inline_kb(admin["shop_id"] if admin else "")
     )
 
 # ============================================================

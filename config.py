@@ -5,8 +5,8 @@ from typing import Optional
 class Settings(BaseSettings):
     BOT_TOKEN: str = "9123131223:AAFKwc8X9xQhbvpVYUr7r6jhGrD-WEhSNoI"
     ADMIN_TELEGRAM_ID: int = 6876312568
-    MINI_APP_URL: str = "https://length-suppliers-imagination-colours.trycloudflare.com"
-    DATABASE_URL: str = "sqlite+aiosqlite:///dokon_hisobi.db"
+    MINI_APP_URL: str = "https://dokon-hisobi.onrender.com"
+    DATABASE_URL: str = "postgresql://postgres.paurqmioymjjqsollezd:Shoxruz2010!@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres"
     ADMIN_SECRET_CODE: str = "DOKON2024"
     TIMEZONE: str = "Asia/Tashkent"
     WEB_SERVER_HOST: str = "0.0.0.0"

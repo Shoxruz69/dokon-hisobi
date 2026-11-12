@@ -8,13 +8,13 @@ services:
     autoDeploy: true
     envVars:
       - key: BOT_TOKEN
-        sync: false
+        value: "9123131223:AAFKwc8X9xQhbvpVYUr7r6jhGrD-WEhSNoI"
       - key: DATABASE_URL
-        sync: false
+        value: "postgresql://postgres.paurqmioymjjqsollezd:Shoxruz2010!@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres"
       - key: ADMIN_TELEGRAM_ID
         value: "6876312568"
       - key: MINI_APP_URL
-        sync: false
+        value: "https://dokon-hisobi.onrender.com"
       - key: ADMIN_SECRET_CODE
         value: DOKON2024
       - key: TIMEZONE
