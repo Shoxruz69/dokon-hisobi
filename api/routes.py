@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from typing import Optional, Any, Dict, List
 from pathlib import Path
 from aiohttp import web
@@ -75,6 +76,18 @@ async def resolve_shop_id(request: web.Request) -> str:
     return ""
 
 # ============================================================
+# API IN-MEMORY TEZKOR KESH (0ms javob berish uchun)
+# ============================================================
+_stats_memory_cache: Dict[str, Any] = {}
+_customers_memory_cache: Dict[str, Any] = {}
+CACHE_TTL = 30 # soniya (har qanday o'zgarishda darhol tozalanadi)
+
+def invalidate_api_cache():
+    """Qarz yoki to'lov o'zgarganda keshni bir zumda tozalash"""
+    _stats_memory_cache.clear()
+    _customers_memory_cache.clear()
+
+# ============================================================
 # API HANDLERS
 # ============================================================
 
@@ -84,14 +97,22 @@ async def handle_get_stats(request: web.Request):
     if not shop_id:
         return web.json_response({"detail": "Do'kon topilmadi"}, status=404)
         
+    target_date = request.query.get("date") or "today"
+    cache_key = f"{shop_id}:{target_date}"
+    now = time.time()
+    if cache_key in _stats_memory_cache:
+        ts, cached_stats = _stats_memory_cache[cache_key]
+        if now - ts < CACHE_TTL:
+            return web.json_response(cached_stats)
+
     admin = await get_admin_by_shop_id(shop_id)
     if not admin:
         return web.json_response({"detail": "Do'kon topilmadi"}, status=404)
         
-    target_date = request.query.get("date")
-    stats = await get_admin_stats(shop_id, target_date=target_date)
+    stats = await get_admin_stats(shop_id, target_date=target_date if target_date != "today" else None)
     stats["shop_name"] = admin["shop_name"]
     stats["shop_id"] = admin["shop_id"]
+    _stats_memory_cache[cache_key] = (now, stats)
     return web.json_response(stats)
 
 async def handle_get_customers(request: web.Request):
@@ -100,10 +121,17 @@ async def handle_get_customers(request: web.Request):
     if not shop_id:
         return web.json_response([], status=200)
 
-    search = request.query.get("search")
-    status_filter = request.query.get("status")
-    
-    customers = await get_customers_list(shop_id, search=search, status_filter=status_filter)
+    search = request.query.get("search") or ""
+    status_filter = request.query.get("status") or "all"
+    cache_key = f"{shop_id}:{search}:{status_filter}"
+    now = time.time()
+    if cache_key in _customers_memory_cache:
+        ts, cached_custs = _customers_memory_cache[cache_key]
+        if now - ts < CACHE_TTL:
+            return web.json_response(cached_custs)
+
+    customers = await get_customers_list(shop_id, search=search if search else None, status_filter=status_filter)
+    _customers_memory_cache[cache_key] = (now, customers)
     return web.json_response(customers)
 
 async def handle_get_customer_detail(request: web.Request):
@@ -179,6 +207,7 @@ async def handle_add_customer(request: web.Request):
         admin_id=admin_id,
         admin_name=admin_name_val
     )
+    invalidate_api_cache()
     return web.json_response(result)
 
 async def handle_mark_paid(request: web.Request):
@@ -216,6 +245,7 @@ async def handle_mark_paid(request: web.Request):
         remaining_debt=res["remaining_debt"]
     ))
         
+    invalidate_api_cache()
     return web.json_response({
         "success": True,
         "paid_amount": res["paid_amount"],
@@ -266,6 +296,7 @@ async def handle_customer_pay(request: web.Request):
         remaining_debt=result["remaining_debt"]
     ))
 
+    invalidate_api_cache()
     return web.json_response({
         "success": True,
         "paid_amount": result["paid_amount"],
@@ -325,6 +356,7 @@ async def handle_customer_add_debt(request: web.Request):
         total_debt=result["total_debt"]
     ))
 
+    invalidate_api_cache()
     return web.json_response({
         "success": True,
         "debt_id": result["debt_id"],

@@ -1588,42 +1588,56 @@
     }
 
     // ============================================================
-    // DASHBOARD (PARALLEL & TEZKOR YUKLASH)
+    // DASHBOARD (BIR LAHZADA KESHDAN CHIQARISH + FONDA YANGILASH)
     // ============================================================
-    async function loadDashboard() {
+    function renderDashboardCards(stats, custs) {
+      if (!stats) return;
+      if (stats.shop_name) {
+        shopData.shopName = stats.shop_name;
+        shopData.shopId = stats.shop_id || shopData.shopId || '5832B1F2';
+        const titleEl = document.getElementById('headerShopTitle');
+        if (titleEl) titleEl.textContent = stats.shop_name;
+        const idEl = document.getElementById('shopIdText');
+        if (idEl) idEl.textContent = stats.shop_id ? stats.shop_id : 'Ulangan';
+      }
+
+      document.getElementById('stat-hero-debt').textContent = formatMoney(stats.total_debt_sum);
+      document.getElementById('stat-overdue').textContent = `${stats.overdue_debts || 0} ta`;
+      document.getElementById('stat-active').textContent = `${stats.active_debts || 0} ta`;
+      document.getElementById('stat-customers').textContent = `${stats.total_customers || 0} ta`;
+      document.getElementById('stat-week').textContent = `${stats.due_this_week || 0} ta`;
+
+      if (custs && custs.length) {
+        renderRecentCustomers(custs.slice(0, 5));
+      }
+    }
+
+    async function loadDashboard(force = false) {
+      // 1. Agar xotirada bo'lsa darhol (0 ms) chizish — kutish va aylanuvchi doira bo'lmaydi!
+      if (cachedStats) {
+        renderDashboardCards(cachedStats, allCustomers);
+      }
       try {
         const [stats, custs] = await Promise.all([
           apiRequest(`/api/stats`),
           apiRequest(`/api/customers`)
         ]);
-
-        if (stats.shop_name) {
-          shopData.shopName = stats.shop_name;
-          shopData.shopId = stats.shop_id || shopData.shopId || '5832B1F2';
-          const titleEl = document.getElementById('headerShopTitle');
-          if (titleEl) titleEl.textContent = stats.shop_name;
-          const idEl = document.getElementById('shopIdText');
-          if (idEl) idEl.textContent = stats.shop_id ? stats.shop_id : 'Ulangan';
-        }
-
-        document.getElementById('stat-hero-debt').textContent = formatMoney(stats.total_debt_sum);
-        document.getElementById('stat-overdue').textContent = `${stats.overdue_debts || 0} ta`;
-        document.getElementById('stat-active').textContent = `${stats.active_debts || 0} ta`;
-        document.getElementById('stat-customers').textContent = `${stats.total_customers || 0} ta`;
-        document.getElementById('stat-week').textContent = `${stats.due_this_week || 0} ta`;
-
-        renderRecentCustomers(custs.slice(0, 5));
+        cachedStats = stats;
+        allCustomers = custs;
+        renderDashboardCards(stats, custs);
       } catch (err) {
-        document.getElementById('dashboardRecentList').innerHTML = `
-          <div class="empty-box">
-            <div class="empty-icon-wrap">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-              </svg>
-            </div>
-            <div class="empty-title">Hozircha mijozlar yo'q</div>
-            <div class="empty-sub">Birinchi qarzdor mijozni qo'shing</div>
-          </div>`;
+        if (!cachedStats) {
+          document.getElementById('dashboardRecentList').innerHTML = `
+            <div class="empty-box">
+              <div class="empty-icon-wrap">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                </svg>
+              </div>
+              <div class="empty-title">Hozircha mijozlar yo'q</div>
+              <div class="empty-sub">Birinchi qarzdor mijozni qo'shing</div>
+            </div>`;
+        }
       }
     }
 
@@ -1646,26 +1660,34 @@
     }
 
     // ============================================================
-    // CUSTOMERS LIST
+    // CUSTOMERS LIST (BIR LAHZADA CHIQARISH)
     // ============================================================
-    async function loadCustomers() {
+    async function loadCustomers(force = false) {
       const container = document.getElementById('customersListContainer');
-      container.innerHTML = '<div class="spinner-box"><div class="spinner"></div></div>';
+      // 1. Agar xotirada allaqachon mijozlar bo'lsa, DARHOL (0 ms) chizamiz!
+      if (allCustomers && allCustomers.length > 0) {
+        renderFilteredCustomers();
+      } else if (!container.children.length) {
+        container.innerHTML = '<div class="spinner-box"><div class="spinner"></div></div>';
+      }
 
       try {
-        allCustomers = await apiRequest(`/api/customers`);
+        const custs = await apiRequest(`/api/customers`);
+        allCustomers = custs;
         renderFilteredCustomers();
       } catch (err) {
-        container.innerHTML = `
-          <div class="empty-box">
-            <div class="empty-icon-wrap">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-              </svg>
-            </div>
-            <div class="empty-title">Mijozlar topilmadi</div>
-            <div class="empty-sub">${escHtml(err.message)}</div>
-          </div>`;
+        if (!allCustomers || allCustomers.length === 0) {
+          container.innerHTML = `
+            <div class="empty-box">
+              <div class="empty-icon-wrap">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+              </div>
+              <div class="empty-title">Mijozlar topilmadi</div>
+              <div class="empty-sub">${escHtml(err.message)}</div>
+            </div>`;
+        }
       }
     }
 
@@ -1885,6 +1907,7 @@
           note: "Mini App orqali yopildi"
         });
         showToast("Qarz to'landi deb belgilandi!", "success");
+        cachedStats = null;
         if (activeCustomerId) openCustomerDetail(activeCustomerId);
         loadCustomers();
       } catch (err) {
@@ -1961,7 +1984,7 @@
         haptic('notification', 'success');
         document.getElementById('modalPayment').classList.remove('show');
         showToast(`${formatMoney(res.paid_amount)} to'landi! Qolgan qarz: ${formatMoney(res.remaining_debt)}`, 'success');
-
+        cachedStats = null;
         openCustomerDetail(activeCustomerId);
         loadCustomers();
       } catch (err) {
@@ -2062,7 +2085,7 @@
         haptic('notification', 'success');
         document.getElementById('modalAddDebt').classList.remove('show');
         showToast(`${formatMoney(amountVal)} qarz qo'shildi! Jami: ${formatMoney(res.total_debt)}`, 'success');
-
+        cachedStats = null;
         openCustomerDetail(activeCustomerId);
         loadCustomers();
       } catch (err) {
@@ -2157,6 +2180,8 @@
         const res = await apiRequest('/api/customers/add', 'POST', payload);
         haptic('notification', 'success');
         showToast(res.is_new ? "Yangi mijoz saqlandi" : "Qarz qo'shildi", "success");
+        cachedStats = null;
+        allCustomers = [];
         resetForm();
         showScreen('customers');
       } catch (err) {
@@ -2211,7 +2236,12 @@
         statsSelectedDate = targetDate;
       }
 
-      container.innerHTML = '<div class="spinner-box"><div class="spinner"></div></div>';
+      // 1. Agar keshda ma'lumot bo'lsa, DARHOL (0 ms) chizamiz — oq ekran va aylanuvchi spinner bo'lmaydi!
+      if (cachedStats) {
+        renderStatsView(cachedStats);
+      } else if (!container.children.length) {
+        container.innerHTML = '<div class="spinner-box"><div class="spinner"></div></div>';
+      }
 
       try {
         const url = targetDate ? `/api/stats?date=${targetDate}` : `/api/stats`;
@@ -2219,17 +2249,23 @@
         cachedStats = stats;
         renderStatsView(stats);
       } catch (err) {
-        container.innerHTML = `
-          <div class="empty-box">
-            <div class="empty-title">Statistika yuklanmadi</div>
-            <div class="empty-sub">${escHtml(err.message)}</div>
-          </div>`;
+        if (!cachedStats) {
+          container.innerHTML = `
+            <div class="empty-box">
+              <div class="empty-title">Statistika yuklanmadi</div>
+              <div class="empty-sub">${escHtml(err.message)}</div>
+            </div>`;
+        }
       }
     }
 
     function switchStatsPeriod(period) {
       statsPeriod = period;
       haptic('impact', 'light');
+      // Tab bosilganda darhol (0 ms) chizamiz!
+      if (cachedStats) {
+        renderStatsView(cachedStats);
+      }
       if (period === 'today') {
         statsSelectedDate = getLocalDateString();
         loadStats(statsSelectedDate);

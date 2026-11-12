@@ -1,5 +1,6 @@
 import uuid
 import logging
+import asyncio
 from datetime import date, datetime, timedelta
 from typing import Optional, List, Dict, Any
 
@@ -478,83 +479,93 @@ async def get_detailed_stats(shop_id: str, target_date: Optional[str] = None) ->
 
     month_start = t_date.replace(day=1)
 
-    # 1. Tanlangan kungi berilgan qarzlar
-    given_row = await db_fetch_one("""
-        SELECT 
-            COUNT(DISTINCT customer_id) as cust_count,
-            COUNT(id) as debt_count,
-            COALESCE(SUM(amount), 0) as total_sum
-        FROM debts 
-        WHERE shop_id = ? AND debt_date = ?
-    """, shop_id, t_date)
+    # Barcha statistik so'rovlarni PARALLEL ravishda yuborish (8 karra tezroq)
+    (
+        given_row,
+        given_list,
+        paid_row,
+        paid_list,
+        month_given,
+        month_paid,
+        overall_row,
+        admin
+    ) = await asyncio.gather(
+        # 1. Tanlangan kungi berilgan qarzlar jami
+        db_fetch_one("""
+            SELECT 
+                COUNT(DISTINCT customer_id) as cust_count,
+                COUNT(id) as debt_count,
+                COALESCE(SUM(amount), 0) as total_sum
+            FROM debts 
+            WHERE shop_id = ? AND debt_date = ?
+        """, shop_id, t_date),
+        # 2. Tanlangan kungi berilgan qarzlar ro'yxati
+        db_fetch_all("""
+            SELECT d.id, d.customer_id, d.amount, d.description, d.due_date, d.created_at,
+                   d.created_by_admin_id, d.created_by_admin_name,
+                   c.full_name as customer_name, c.phone as customer_phone
+            FROM debts d
+            JOIN customers c ON c.id = d.customer_id
+            WHERE d.shop_id = ? AND d.debt_date = ?
+            ORDER BY d.id DESC
+        """, shop_id, t_date),
+        # 3. Tanlangan kungi undirilgan to'lovlar jami
+        db_fetch_one("""
+            SELECT 
+                COUNT(DISTINCT d.customer_id) as cust_count,
+                COUNT(ph.id) as pay_count,
+                COALESCE(SUM(ph.amount), 0) as total_sum
+            FROM payment_history ph
+            JOIN debts d ON d.id = ph.debt_id
+            WHERE d.shop_id = ? AND DATE(ph.paid_at) = ?
+        """, shop_id, t_date),
+        # 4. Tanlangan kungi undirilgan to'lovlar ro'yxati
+        db_fetch_all("""
+            SELECT ph.id, ph.debt_id, ph.amount, ph.paid_at, ph.note, ph.admin_id, ph.admin_name,
+                   d.customer_id, d.description as debt_description,
+                   c.full_name as customer_name, c.phone as customer_phone
+            FROM payment_history ph
+            JOIN debts d ON d.id = ph.debt_id
+            JOIN customers c ON c.id = d.customer_id
+            WHERE d.shop_id = ? AND DATE(ph.paid_at) = ?
+            ORDER BY ph.id DESC
+        """, shop_id, t_date),
+        # 5. Oylik berilgan qarzlar
+        db_fetch_one("""
+            SELECT 
+                COUNT(DISTINCT customer_id) as cust_count,
+                COUNT(id) as debt_count,
+                COALESCE(SUM(amount), 0) as total_sum
+            FROM debts 
+            WHERE shop_id = ? AND debt_date >= ?
+        """, shop_id, month_start),
+        # 6. Oylik undirilgan to'lovlar
+        db_fetch_one("""
+            SELECT 
+                COUNT(DISTINCT d.customer_id) as cust_count,
+                COUNT(ph.id) as pay_count,
+                COALESCE(SUM(ph.amount), 0) as total_sum
+            FROM payment_history ph
+            JOIN debts d ON d.id = ph.debt_id
+            WHERE d.shop_id = ? AND DATE(ph.paid_at) >= ?
+        """, shop_id, month_start),
+        # 7. Umumiy ko'rsatkichlar
+        db_fetch_one("""
+            SELECT 
+                COUNT(DISTINCT c.id) as total_customers,
+                COUNT(DISTINCT CASE WHEN d.status = 'active' THEN d.id END) as active_debts,
+                COUNT(DISTINCT CASE WHEN d.status = 'overdue' THEN d.id END) as overdue_debts,
+                COALESCE(SUM(CASE WHEN d.status IN ('active', 'overdue') THEN d.amount END), 0) as total_debt_sum,
+                COUNT(DISTINCT CASE WHEN d.due_date BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '7 days') 
+                           AND d.status = 'active' THEN d.id END) as due_this_week
+            FROM customers c
+            LEFT JOIN debts d ON d.customer_id = c.id
+            WHERE c.shop_id = ?
+        """, shop_id),
+        # 8. Do'kon ma'lumotlari
+        get_admin_by_shop_id(shop_id)
+    )
 
-    given_list = await db_fetch_all("""
-        SELECT d.id, d.customer_id, d.amount, d.description, d.due_date, d.created_at,
-               d.created_by_admin_id, d.created_by_admin_name,
-               c.full_name as customer_name, c.phone as customer_phone
-        FROM debts d
-        JOIN customers c ON c.id = d.customer_id
-        WHERE d.shop_id = ? AND d.debt_date = ?
-        ORDER BY d.id DESC
-    """, shop_id, t_date)
-
-    # 2. Tanlangan kungi undirilgan to'lovlar
-    paid_row = await db_fetch_one("""
-        SELECT 
-            COUNT(DISTINCT d.customer_id) as cust_count,
-            COUNT(ph.id) as pay_count,
-            COALESCE(SUM(ph.amount), 0) as total_sum
-        FROM payment_history ph
-        JOIN debts d ON d.id = ph.debt_id
-        WHERE d.shop_id = ? AND DATE(ph.paid_at) = ?
-    """, shop_id, t_date)
-
-    paid_list = await db_fetch_all("""
-        SELECT ph.id, ph.debt_id, ph.amount, ph.paid_at, ph.note, ph.admin_id, ph.admin_name,
-               d.customer_id, d.description as debt_description,
-               c.full_name as customer_name, c.phone as customer_phone
-        FROM payment_history ph
-        JOIN debts d ON d.id = ph.debt_id
-        JOIN customers c ON c.id = d.customer_id
-        WHERE d.shop_id = ? AND DATE(ph.paid_at) = ?
-        ORDER BY ph.id DESC
-    """, shop_id, t_date)
-
-    # 3. Tanlangan oydagi berilgan va undirilgan
-    month_given = await db_fetch_one("""
-        SELECT 
-            COUNT(DISTINCT customer_id) as cust_count,
-            COUNT(id) as debt_count,
-            COALESCE(SUM(amount), 0) as total_sum
-        FROM debts 
-        WHERE shop_id = ? AND debt_date >= ?
-    """, shop_id, month_start)
-
-    month_paid = await db_fetch_one("""
-        SELECT 
-            COUNT(DISTINCT d.customer_id) as cust_count,
-            COUNT(ph.id) as pay_count,
-            COALESCE(SUM(ph.amount), 0) as total_sum
-        FROM payment_history ph
-        JOIN debts d ON d.id = ph.debt_id
-        WHERE d.shop_id = ? AND DATE(ph.paid_at) >= ?
-    """, shop_id, month_start)
-
-    # 4. Umumiy
-    overall_row = await db_fetch_one("""
-        SELECT 
-            COUNT(DISTINCT c.id) as total_customers,
-            COUNT(DISTINCT CASE WHEN d.status = 'active' THEN d.id END) as active_debts,
-            COUNT(DISTINCT CASE WHEN d.status = 'overdue' THEN d.id END) as overdue_debts,
-            COALESCE(SUM(CASE WHEN d.status IN ('active', 'overdue') THEN d.amount END), 0) as total_debt_sum,
-            COUNT(DISTINCT CASE WHEN d.due_date BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '7 days') 
-                       AND d.status = 'active' THEN d.id END) as due_this_week
-        FROM customers c
-        LEFT JOIN debts d ON d.customer_id = c.id
-        WHERE c.shop_id = ?
-    """, shop_id)
-
-    admin = await get_admin_by_shop_id(shop_id)
     shop_name = admin["shop_name"] if admin else "Do'kon"
 
     return {
