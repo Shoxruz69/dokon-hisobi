@@ -1336,7 +1336,7 @@
 
       <!-- Telefon -->
       <div class="form-group">
-        <label class="form-label">Telefon Raqami *</label>
+        <label class="form-label">Telefon Raqami <span style="font-weight:400;color:var(--text-light);font-size:12px">(ixtiyoriy)</span></label>
         <div class="input-box">
           <span class="input-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1357,7 +1357,7 @@
               <rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/>
             </svg>
           </span>
-          <input type="number" class="custom-input" id="inp-amount" placeholder="150000" min="100">
+          <input type="text" class="custom-input" id="inp-amount" placeholder="Masalan: 150 000" inputmode="numeric" autocomplete="off">
         </div>
         <div class="chips-group">
           <button type="button" class="chip-btn" onclick="setQuickAmount(50000)">+50 000</button>
@@ -1370,14 +1370,14 @@
 
       <!-- Mahsulot -->
       <div class="form-group">
-        <label class="form-label">Nima oldi (Mahsulotlar) *</label>
+        <label class="form-label">Nima oldi (Mahsulotlar) <span style="font-weight:400;color:var(--text-light);font-size:12px">(ixtiyoriy)</span></label>
         <div class="input-box">
           <span class="input-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
             </svg>
           </span>
-          <input type="text" class="custom-input" id="inp-desc" placeholder="Un 10kg, Yog' 2L, Shakar 3kg">
+          <input type="text" class="custom-input" id="inp-desc" placeholder="Masalan: Un, yog', shakar (ixtiyoriy)">
         </div>
         <div class="error-msg" id="err-desc"></div>
       </div>
@@ -1949,19 +1949,19 @@
 
     function setPayPercent(pct) {
       const amt = Math.round(activeCustomerDebtAmount * pct);
-      document.getElementById('inp-pay-amount').value = amt > 0 ? amt : '';
+      document.getElementById('inp-pay-amount').value = amt > 0 ? formatNumberWithSpaces(amt) : '';
       haptic('impact', 'light');
     }
 
     function addPayQuick(val) {
       const el = document.getElementById('inp-pay-amount');
-      const cur = parseFloat(el.value) || 0;
-      el.value = cur + val;
+      const cur = parseFormattedNumber(el.value);
+      el.value = formatNumberWithSpaces(cur + val);
       haptic('impact', 'light');
     }
 
     async function submitPayment() {
-      const amountVal = parseFloat(document.getElementById('inp-pay-amount').value);
+      const amountVal = parseFormattedNumber(document.getElementById('inp-pay-amount').value);
       const noteVal = document.getElementById('inp-pay-note').value.trim();
 
       if (!amountVal || amountVal <= 0) {
@@ -2033,8 +2033,8 @@
 
     function addDebtQuickAmount(val) {
       const el = document.getElementById('inp-adddebt-amount');
-      const cur = parseFloat(el.value) || 0;
-      el.value = cur + val;
+      const cur = parseFormattedNumber(el.value);
+      el.value = formatNumberWithSpaces(cur + val);
       haptic('impact', 'light');
     }
 
@@ -2046,8 +2046,8 @@
     }
 
     async function submitAddDebt() {
-      const amountVal = parseFloat(document.getElementById('inp-adddebt-amount').value);
-      const descVal = document.getElementById('inp-adddebt-desc').value.trim();
+      const amountVal = parseFormattedNumber(document.getElementById('inp-adddebt-amount').value);
+      const descVal = document.getElementById('inp-adddebt-desc').value.trim() || 'Nasiya savdo';
       const dateVal = document.getElementById('inp-adddebt-date').value;
       const notesVal = document.getElementById('inp-adddebt-notes').value.trim();
 
@@ -2057,10 +2057,7 @@
         valid = false;
       } else clearFieldError('adddebt-amount');
 
-      if (!descVal || descVal.length < 2) {
-        showFieldError('adddebt-desc', 'Mahsulot nomini yozing');
-        valid = false;
-      } else clearFieldError('adddebt-desc');
+      clearFieldError('adddebt-desc');
 
       if (!dateVal) {
         showFieldError('adddebt-date', 'To\'lov muddatini tanlang');
@@ -2110,10 +2107,59 @@
       setQuickDays(7);
     }
 
+    function formatNumberWithSpaces(val) {
+      if (val === null || val === undefined || val === '') return '';
+      const clean = String(val).replace(/\D/g, '');
+      if (!clean) return '';
+      return clean.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    }
+
+    function parseFormattedNumber(val) {
+      if (!val) return 0;
+      return parseFloat(String(val).replace(/\s/g, '')) || 0;
+    }
+
+    function setupAmountFormatter(elId) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      el.addEventListener('input', function() {
+        const clean = this.value.replace(/\D/g, '');
+        if (!clean) {
+          this.value = '';
+          return;
+        }
+        this.value = clean.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+      });
+    }
+
+    function setupPhoneFormatter(elId) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      el.addEventListener('input', function() {
+        let val = this.value.replace(/\D/g, '');
+        if (val.startsWith('998')) {
+          val = val.substring(3);
+        } else if (val.startsWith('8')) {
+          val = val.substring(1);
+        }
+        val = val.substring(0, 9);
+        if (!val) {
+          this.value = '';
+          return;
+        }
+        let res = '+998';
+        if (val.length > 0) res += ' ' + val.substring(0, 2);
+        if (val.length > 2) res += ' ' + val.substring(2, 5);
+        if (val.length > 5) res += ' ' + val.substring(5, 7);
+        if (val.length > 7) res += ' ' + val.substring(7, 9);
+        this.value = res;
+      });
+    }
+
     function setQuickAmount(val) {
       const el = document.getElementById('inp-amount');
-      const cur = parseFloat(el.value) || 0;
-      el.value = cur + val;
+      const cur = parseFormattedNumber(el.value);
+      el.value = formatNumberWithSpaces(cur + val);
       haptic('impact', 'light');
     }
 
@@ -2126,9 +2172,9 @@
 
     async function submitForm() {
       const name = document.getElementById('inp-name').value.trim();
-      const phone = document.getElementById('inp-phone').value.trim();
-      const amount = parseFloat(document.getElementById('inp-amount').value);
-      const desc = document.getElementById('inp-desc').value.trim();
+      const phoneRaw = document.getElementById('inp-phone').value.trim();
+      const amount = parseFormattedNumber(document.getElementById('inp-amount').value);
+      const desc = document.getElementById('inp-desc').value.trim() || 'Nasiya savdo';
       const date = document.getElementById('inp-date').value;
       const notes = document.getElementById('inp-notes').value.trim();
 
@@ -2138,8 +2184,10 @@
         valid = false;
       } else clearFieldError('name');
 
-      if (!phone || phone.replace(/[\s\-\(\)\+]/g, '').length < 9) {
-        showFieldError('phone', 'To\'g\'ri telefon raqam kiriting');
+      // Telefon raqam ixtiyoriy (agar kiritilsa to'liq bo'lsin)
+      const phoneDigits = phoneRaw.replace(/\D/g, '');
+      if (phoneDigits.length > 0 && phoneDigits.length < 9) {
+        showFieldError('phone', 'Telefon raqam to\'liq bo\'lsin yoki bo\'sh qoldiring');
         valid = false;
       } else clearFieldError('phone');
 
@@ -2148,10 +2196,8 @@
         valid = false;
       } else clearFieldError('amount');
 
-      if (!desc || desc.length < 2) {
-        showFieldError('desc', 'Nima olganini yozing');
-        valid = false;
-      } else clearFieldError('desc');
+      // Nima oldi (Mahsulotlar) ixtiyoriy
+      clearFieldError('desc');
 
       if (!date) {
         showFieldError('date', 'To\'lov sanasini tanlang');
@@ -2171,7 +2217,7 @@
         const payload = {
           shop_id: shopData.shopId,
           full_name: name,
-          phone: phone,
+          phone: phoneDigits.length >= 9 ? phoneRaw.replace(/\s+/g, '') : null,
           amount: amount,
           description: desc,
           due_date: date,
@@ -2693,6 +2739,10 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+      setupAmountFormatter('inp-amount');
+      setupAmountFormatter('inp-pay-amount');
+      setupAmountFormatter('inp-adddebt-amount');
+      setupPhoneFormatter('inp-phone');
       checkAuthAndBoot();
     });
   </script>
@@ -2725,7 +2775,7 @@
                 <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
               </svg>
             </span>
-            <input type="number" class="custom-input" id="inp-pay-amount" placeholder="Masalan: 50000" inputmode="numeric">
+            <input type="text" class="custom-input" id="inp-pay-amount" placeholder="Masalan: 50 000" inputmode="numeric" autocomplete="off">
           </div>
           <div class="field-error" id="err-pay-amount"></div>
         </div>
@@ -2782,7 +2832,7 @@
                 <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
               </svg>
             </span>
-            <input type="number" class="custom-input" id="inp-adddebt-amount" placeholder="Masalan: 100000" inputmode="numeric">
+            <input type="text" class="custom-input" id="inp-adddebt-amount" placeholder="Masalan: 100 000" inputmode="numeric" autocomplete="off">
           </div>
           <div class="field-error" id="err-adddebt-amount"></div>
         </div>
@@ -2795,14 +2845,14 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Nima olingan (Mahsulot) *</label>
+          <label class="form-label">Nima olingan (Mahsulot) <span style="font-weight:400;color:var(--text-light);font-size:12px">(ixtiyoriy)</span></label>
           <div class="input-box">
             <span class="input-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
               </svg>
             </span>
-            <input type="text" class="custom-input" id="inp-adddebt-desc" placeholder="Masalan: 2 qop un, 5L yog'">
+            <input type="text" class="custom-input" id="inp-adddebt-desc" placeholder="Masalan: 2 qop un (ixtiyoriy)">
           </div>
           <div class="field-error" id="err-adddebt-desc"></div>
         </div>

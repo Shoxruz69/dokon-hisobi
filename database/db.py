@@ -146,7 +146,7 @@ async def init_db():
                     id SERIAL PRIMARY KEY,
                     shop_id TEXT NOT NULL REFERENCES admins(shop_id),
                     full_name TEXT NOT NULL,
-                    phone TEXT NOT NULL,
+                    phone TEXT,
                     telegram_id BIGINT,
                     notes TEXT,
                     total_debt NUMERIC(15, 2) DEFAULT 0,
@@ -159,7 +159,7 @@ async def init_db():
                     customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
                     shop_id TEXT NOT NULL REFERENCES admins(shop_id),
                     amount NUMERIC(15, 2) NOT NULL CHECK(amount > 0),
-                    description TEXT NOT NULL,
+                    description TEXT DEFAULT 'Nasiya savdo',
                     debt_date DATE NOT NULL DEFAULT CURRENT_DATE,
                     due_date DATE NOT NULL,
                     status VARCHAR(20) DEFAULT 'active' CHECK(status IN ('active','paid','overdue')),
@@ -198,6 +198,8 @@ async def init_db():
                 CREATE INDEX IF NOT EXISTS idx_debts_status ON debts(status);
                 CREATE INDEX IF NOT EXISTS idx_debts_due_date ON debts(due_date);
 
+                ALTER TABLE customers ALTER COLUMN phone DROP NOT NULL;
+                ALTER TABLE debts ALTER COLUMN description DROP NOT NULL;
                 ALTER TABLE debts ADD COLUMN IF NOT EXISTS created_by_admin_id BIGINT;
                 ALTER TABLE debts ADD COLUMN IF NOT EXISTS created_by_admin_name TEXT;
                 ALTER TABLE payment_history ADD COLUMN IF NOT EXISTS admin_name TEXT;
@@ -225,7 +227,7 @@ async def init_db():
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     shop_id TEXT NOT NULL,
                     full_name TEXT NOT NULL,
-                    phone TEXT NOT NULL,
+                    phone TEXT,
                     telegram_id BIGINT,
                     notes TEXT,
                     total_debt REAL DEFAULT 0,
@@ -239,7 +241,7 @@ async def init_db():
                     customer_id INTEGER NOT NULL,
                     shop_id TEXT NOT NULL,
                     amount REAL NOT NULL CHECK(amount > 0),
-                    description TEXT NOT NULL,
+                    description TEXT DEFAULT 'Nasiya savdo',
                     debt_date DATE NOT NULL DEFAULT (DATE('now')),
                     due_date DATE NOT NULL,
                     status TEXT DEFAULT 'active' CHECK(status IN ('active','paid','overdue')),

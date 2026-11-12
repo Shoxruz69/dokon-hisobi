@@ -177,9 +177,13 @@ async def handle_add_customer(request: web.Request):
     if not is_name_ok:
         return web.json_response({"detail": name_val}, status=400)
 
-    is_phone_ok, phone_val = validate_phone(phone)
-    if not is_phone_ok:
-        return web.json_response({"detail": phone_val}, status=400)
+    # Telefon raqam ixtiyoriy
+    phone_val = None
+    if phone and phone.strip():
+        is_phone_ok, valid_phone = validate_phone(phone.strip())
+        if not is_phone_ok:
+            return web.json_response({"detail": valid_phone}, status=400)
+        phone_val = valid_phone
 
     is_amt_ok, amt_val = validate_amount(amount)
     if not is_amt_ok:
@@ -189,8 +193,9 @@ async def handle_add_customer(request: web.Request):
     if not is_date_ok:
         return web.json_response({"detail": date_val}, status=400)
 
-    if len(description) < 2:
-        return web.json_response({"detail": "Nima olinganini yozing"}, status=400)
+    # Nima olingani (Mahsulot) ixtiyoriy
+    if not description or len(description.strip()) == 0:
+        description = "Nasiya savdo"
 
     admin_id_val = request.headers.get("X-Telegram-User-Id") or data.get("admin_id")
     admin_name_val = request.headers.get("X-Admin-Name") or data.get("admin_name")
@@ -329,8 +334,8 @@ async def handle_customer_add_debt(request: web.Request):
     if not is_amt_ok:
         return web.json_response({"detail": amt_val}, status=400)
 
-    if len(description) < 2:
-        return web.json_response({"detail": "Nima olinganini yozing"}, status=400)
+    if not description or len(description.strip()) == 0:
+        description = "Nasiya savdo"
 
     is_date_ok, date_val = validate_date(due_date)
     if not is_date_ok:

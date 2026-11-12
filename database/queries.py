@@ -128,9 +128,9 @@ async def update_admin_phone(telegram_id: int, phone: str) -> bool:
 async def add_customer(
     shop_id: str,
     full_name: str,
-    phone: str,
+    phone: Optional[str],
     amount: float,
-    description: str,
+    description: Optional[str],
     due_date: str,
     telegram_id: Optional[int] = None,
     notes: Optional[str] = None,
@@ -143,18 +143,28 @@ async def add_customer(
     d_due = date.fromisoformat(due_date) if isinstance(due_date, str) else due_date
     resolved_name = resolve_admin_label(admin_id, admin_name)
 
+    clean_phone = phone.strip() if phone and str(phone).strip() else None
+    desc_val = description.strip() if description and str(description).strip() else "Nasiya savdo"
+
     # 1. Mijoz bor-yo'qligini tekshirish
-    customer = await db_fetch_one(
-        "SELECT id, total_debt FROM customers WHERE shop_id = ? AND phone = ?",
-        shop_id, phone
-    )
+    customer = None
+    if clean_phone:
+        customer = await db_fetch_one(
+            "SELECT id, total_debt FROM customers WHERE shop_id = ? AND phone = ?",
+            shop_id, clean_phone
+        )
+    else:
+        customer = await db_fetch_one(
+            "SELECT id, total_debt FROM customers WHERE shop_id = ? AND full_name = ? AND (phone IS NULL OR phone = '')",
+            shop_id, full_name.strip()
+        )
     
     is_new = False
     if not customer:
         customer_id = await db_execute_insert("""
             INSERT INTO customers (shop_id, full_name, phone, telegram_id, notes, total_debt)
             VALUES (?, ?, ?, ?, ?, 0)
-        """, shop_id, full_name.strip(), phone.strip(), telegram_id, notes)
+        """, shop_id, full_name.strip(), clean_phone, telegram_id, notes)
         is_new = True
     else:
         customer_id = customer["id"]
@@ -165,7 +175,7 @@ async def add_customer(
     debt_id = await db_execute_insert("""
         INSERT INTO debts (customer_id, shop_id, amount, description, debt_date, due_date, status, created_by_admin_id, created_by_admin_name)
         VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)
-    """, customer_id, shop_id, float(amount), description.strip(), d_date, d_due, admin_id, resolved_name)
+    """, customer_id, shop_id, float(amount), desc_val, d_date, d_due, admin_id, resolved_name)
 
     # 3. Jami qarzni qayta hisoblash
     total_row = await db_fetch_one(
@@ -735,11 +745,12 @@ async def add_debt_to_existing_customer(
     d_date = date.today()
     d_due = date.fromisoformat(due_date) if isinstance(due_date, str) else due_date
     resolved_name = resolve_admin_label(admin_id, admin_name)
+    desc_val = description.strip() if description and str(description).strip() else "Nasiya savdo"
 
     debt_id = await db_execute_insert("""
         INSERT INTO debts (customer_id, shop_id, amount, description, debt_date, due_date, status, admin_note, created_by_admin_id, created_by_admin_name)
         VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
-    """, customer_id, shop_id, float(amount), description.strip(), d_date, d_due, notes, admin_id, resolved_name)
+    """, customer_id, shop_id, float(amount), desc_val, d_date, d_due, notes, admin_id, resolved_name)
 
     total_row = await db_fetch_one(
         "SELECT COALESCE(SUM(amount), 0) as total FROM debts WHERE customer_id = ? AND status IN ('active', 'overdue')",
