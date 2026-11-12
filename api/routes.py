@@ -18,7 +18,9 @@ from database.queries import (
     add_customer,
     mark_debt_paid,
     record_customer_payment,
-    add_debt_to_existing_customer
+    add_debt_to_existing_customer,
+    update_customer,
+    delete_customer
 )
 from utils.validators import validate_phone, validate_amount, validate_date, validate_full_name
 from utils.notifications import (
@@ -369,6 +371,69 @@ async def handle_customer_add_debt(request: web.Request):
         "admin_name": result.get("created_by_admin_name")
     })
 
+async def handle_customer_edit(request: web.Request):
+    """POST /api/customer/{customer_id}/edit yoki PUT /api/customer/{customer_id}"""
+    try:
+        customer_id = int(request.match_info.get("customer_id"))
+    except (ValueError, TypeError):
+        return web.json_response({"detail": "Noto'g'ri customer_id"}, status=400)
+
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"detail": "Noto'g'ri JSON formati"}, status=400)
+
+    shop_id = await resolve_shop_id(request)
+    if not shop_id:
+        return web.json_response({"detail": "shop_id aniqlanmadi"}, status=400)
+
+    full_name = data.get("full_name", "").strip()
+    phone = data.get("phone", "")
+    notes = data.get("notes")
+
+    is_name_ok, name_val = validate_full_name(full_name)
+    if not is_name_ok:
+        return web.json_response({"detail": name_val}, status=400)
+
+    phone_val = None
+    if phone and str(phone).strip():
+        is_phone_ok, valid_phone = validate_phone(str(phone).strip())
+        if not is_phone_ok:
+            return web.json_response({"detail": valid_phone}, status=400)
+        phone_val = valid_phone
+
+    try:
+        updated = await update_customer(customer_id, shop_id, name_val, phone_val, notes)
+    except ValueError as e:
+        return web.json_response({"detail": str(e)}, status=400)
+
+    if not updated:
+        return web.json_response({"detail": "Mijoz topilmadi"}, status=404)
+
+    invalidate_api_cache()
+    return web.json_response({
+        "success": True,
+        "customer": updated
+    })
+
+async def handle_customer_delete(request: web.Request):
+    """POST /api/customer/{customer_id}/delete yoki DELETE /api/customer/{customer_id}"""
+    try:
+        customer_id = int(request.match_info.get("customer_id"))
+    except (ValueError, TypeError):
+        return web.json_response({"detail": "Noto'g'ri customer_id"}, status=400)
+
+    shop_id = await resolve_shop_id(request)
+    if not shop_id:
+        return web.json_response({"detail": "shop_id aniqlanmadi"}, status=400)
+
+    success = await delete_customer(customer_id, shop_id)
+    if not success:
+        return web.json_response({"detail": "Mijoz topilmadi yoki o'chirishda xatolik"}, status=404)
+
+    invalidate_api_cache()
+    return web.json_response({"success": True})
+
 async def handle_get_me(request: web.Request):
     """Foydalanuvchi roli va ma'lumotlarini aniqlash (Admin yoki Mijoz)"""
     role_param = request.query.get("role", "").strip().lower()
@@ -481,6 +546,10 @@ def create_web_app() -> web.Application:
     app.router.add_get("/api/customer/{customer_id}", handle_get_customer_detail)
     app.router.add_post("/api/customer/{customer_id}/pay", handle_customer_pay)
     app.router.add_post("/api/customer/{customer_id}/add-debt", handle_customer_add_debt)
+    app.router.add_post("/api/customer/{customer_id}/edit", handle_customer_edit)
+    app.router.add_put("/api/customer/{customer_id}", handle_customer_edit)
+    app.router.add_post("/api/customer/{customer_id}/delete", handle_customer_delete)
+    app.router.add_delete("/api/customer/{customer_id}", handle_customer_delete)
     app.router.add_post("/api/customers/add", handle_add_customer)
     app.router.add_post("/api/debt/{debt_id}/pay", handle_mark_paid)
     

@@ -271,6 +271,63 @@ async def get_customer_payments(customer_id: int) -> List[dict]:
         ORDER BY ph.paid_at DESC
     """, customer_id)
 
+async def update_customer(
+    customer_id: int,
+    shop_id: str,
+    full_name: str,
+    phone: Optional[str] = None,
+    notes: Optional[str] = None
+) -> Optional[dict]:
+    """Mijoz ma'lumotlarini (ism, telefon, izoh) yangilash"""
+    clean_name = full_name.strip()
+    clean_phone = phone.strip() if phone and str(phone).strip() else None
+    clean_notes = notes.strip() if notes and str(notes).strip() else None
+
+    # Do'konga tegishli ekanini tekshirish
+    cust = await db_fetch_one("SELECT * FROM customers WHERE id = ? AND shop_id = ?", customer_id, shop_id)
+    if not cust:
+        return None
+
+    # Agar telefon kiritilgan bo'lsa, boshqa mijozda bu telefon yo'qligini tekshirish
+    if clean_phone:
+        existing = await db_fetch_one(
+            "SELECT id FROM customers WHERE shop_id = ? AND phone = ? AND id != ?",
+            shop_id, clean_phone, customer_id
+        )
+        if existing:
+            raise ValueError(f"Ushbu telefon raqami ({clean_phone}) boshqa mijozda mavjud")
+
+    await db_execute("""
+        UPDATE customers 
+        SET full_name = ?, phone = ?, notes = ?
+        WHERE id = ? AND shop_id = ?
+    """, clean_name, clean_phone, clean_notes, customer_id, shop_id)
+
+    return await db_fetch_one("SELECT * FROM customers WHERE id = ?", customer_id)
+
+async def delete_customer(customer_id: int, shop_id: str) -> bool:
+    """Mijozni va uning barcha bog'liq qarz/to'lov ma'lumotlarini to'liq o'chirish"""
+    cust = await db_fetch_one("SELECT * FROM customers WHERE id = ? AND shop_id = ?", customer_id, shop_id)
+    if not cust:
+        return False
+
+    # 1. To'lovlar tarixini o'chirish
+    await db_execute("""
+        DELETE FROM payment_history 
+        WHERE debt_id IN (SELECT id FROM debts WHERE customer_id = ?)
+    """, customer_id)
+
+    # 2. Xabarnomalar tarixini o'chirish
+    await db_execute("DELETE FROM notifications_log WHERE customer_id = ?", customer_id)
+
+    # 3. Qarzlarni o'chirish
+    await db_execute("DELETE FROM debts WHERE customer_id = ? AND shop_id = ?", customer_id, shop_id)
+
+    # 4. Mijozning o'zini o'chirish
+    await db_execute("DELETE FROM customers WHERE id = ? AND shop_id = ?", customer_id, shop_id)
+
+    return True
+
 async def get_customer_by_phone(shop_id: str, phone: str) -> Optional[dict]:
     """Telefon raqami bo'yicha mijozni qidirish"""
     return await db_fetch_one("SELECT * FROM customers WHERE shop_id = ? AND phone = ?", shop_id, phone)

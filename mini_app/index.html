@@ -1924,6 +1924,19 @@
                 <span>Qarz qo'shish</span>
               </button>
             </div>
+
+            <!-- MIJOZNI TAHRIRLASH VA O'CHIRISH TUGMALARI -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+              <button type="button" class="btn-subtle" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:var(--radius-md);font-weight:600;font-size:13px;border:1px solid var(--border);background:var(--bg-app);color:var(--text-main)" onclick="openEditCustomerModal(${data.id})">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                <span>Tahrirlash</span>
+              </button>
+
+              <button type="button" class="btn-subtle" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:var(--radius-md);font-weight:600;font-size:13px;border:1px solid rgba(239, 68, 68, 0.2);color:var(--danger);background:var(--danger-light)" onclick="confirmDeleteCustomer(${data.id}, '${escHtml(data.full_name)}')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                <span>O'chirish</span>
+              </button>
+            </div>
           </div>
           
           <h4 class="section-title" style="margin-bottom:12px">Qarzlar Tarixi (${data.debts?.length || 0})</h4>
@@ -2129,6 +2142,131 @@
       } finally {
         btn.disabled = false;
         btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Qarzni saqlash`;
+      }
+    }
+
+    // ============================================================
+    // MIJOZNI TAHRIRLASH VA O'CHIRISH FUNKSIYALARI
+    // ============================================================
+    async function openEditCustomerModal(customerId) {
+      activeCustomerId = customerId;
+      document.getElementById('edit-customer-id').value = customerId;
+
+      clearFieldError('edit-name');
+      clearFieldError('edit-phone');
+
+      // 1. Keshdan tezkor to'ldirish
+      const cust = (allCustomers || []).find(c => c.id === customerId);
+      if (cust) {
+        document.getElementById('inp-edit-name').value = cust.full_name || '';
+        document.getElementById('inp-edit-phone').value = cust.phone || '';
+        document.getElementById('inp-edit-notes').value = cust.notes || '';
+      }
+
+      const modal = document.getElementById('modalEditCustomer');
+      modal.classList.add('show');
+      haptic('impact', 'medium');
+      setTimeout(() => {
+        const inp = document.getElementById('inp-edit-name');
+        if (inp) inp.focus();
+      }, 200);
+
+      // 2. To'liq kartochkadan yangilash
+      try {
+        const fullCust = await apiRequest(`/api/customer/${customerId}`);
+        if (fullCust) {
+          document.getElementById('inp-edit-name').value = fullCust.full_name || '';
+          document.getElementById('inp-edit-phone').value = fullCust.phone || '';
+          document.getElementById('inp-edit-notes').value = fullCust.notes || '';
+        }
+      } catch (e) {}
+    }
+
+    function closeEditCustomerModal(e) {
+      if (e && e.target && !e.target.classList.contains('custom-modal-backdrop') && !e.target.classList.contains('modal-close-btn') && !e.target.classList.contains('btn-subtle')) return;
+      document.getElementById('modalEditCustomer').classList.remove('show');
+      haptic('impact', 'light');
+    }
+
+    async function submitEditCustomer() {
+      const customerId = document.getElementById('edit-customer-id').value;
+      const name = document.getElementById('inp-edit-name').value.trim();
+      const phoneRaw = document.getElementById('inp-edit-phone').value.trim();
+      const notes = document.getElementById('inp-edit-notes').value.trim();
+
+      let valid = true;
+      if (!name || name.length < 2) {
+        showFieldError('edit-name', 'Ism va familiyani to\'liq kiriting');
+        valid = false;
+      } else clearFieldError('edit-name');
+
+      const phoneDigits = phoneRaw.replace(/\D/g, '');
+      if (phoneDigits.length > 0 && phoneDigits.length < 9) {
+        showFieldError('edit-phone', 'Telefon raqam to\'liq bo\'lsin yoki bo\'sh qoldiring');
+        valid = false;
+      } else clearFieldError('edit-phone');
+
+      if (!valid) {
+        haptic('notification', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('btnSubmitEditCustomer');
+      btn.disabled = true;
+      btn.innerHTML = 'Saqlanmoqda...';
+
+      try {
+        const payload = {
+          full_name: name,
+          phone: phoneDigits.length >= 9 ? phoneRaw.replace(/\s+/g, '') : null,
+          notes: notes || null
+        };
+        const res = await apiRequest(`/api/customer/${customerId}/edit`, 'POST', payload);
+        haptic('notification', 'success');
+        document.getElementById('modalEditCustomer').classList.remove('show');
+        showToast('Mijoz ma\'lumotlari yangilandi!', 'success');
+
+        // Mahalliy keshni yangilash
+        allCustomers = (allCustomers || []).map(c => {
+          if (c.id === parseInt(customerId)) {
+            return { ...c, full_name: res.customer.full_name, phone: res.customer.phone, notes: res.customer.notes };
+          }
+          return c;
+        });
+        setLocalCache('dh_customers', allCustomers);
+
+        openCustomerDetail(customerId);
+        loadCustomers();
+      } catch (err) {
+        haptic('notification', 'error');
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Saqlash`;
+      }
+    }
+
+    async function confirmDeleteCustomer(customerId, customerName) {
+      haptic('impact', 'medium');
+      const ok = confirm(`"${customerName}" va uning barcha qarz ma'lumotlarini o'chirishni xohlaysizmi?\n\nDiqqat: Ushbu mijozning barcha qarz va to'lovlar tarixi butunlay o'chiriladi!`);
+      if (!ok) return;
+
+      try {
+        await apiRequest(`/api/customer/${customerId}/delete`, 'POST');
+        haptic('notification', 'success');
+        showToast('Mijoz muvaffaqiyatli o\'chirildi', 'success');
+
+        // Keshdan chiqarish
+        allCustomers = (allCustomers || []).filter(c => c.id !== parseInt(customerId));
+        setLocalCache('dh_customers', allCustomers);
+        cachedStats = null;
+        try { localStorage.removeItem('dh_stats'); } catch (e) {}
+
+        showScreen('customers');
+        loadCustomers();
+      } catch (err) {
+        haptic('notification', 'error');
+        showToast(err.message, 'error');
       }
     }
 
@@ -2816,6 +2954,7 @@
       setupAmountFormatter('inp-pay-amount');
       setupAmountFormatter('inp-adddebt-amount');
       setupPhoneFormatter('inp-phone');
+      setupPhoneFormatter('inp-edit-phone');
       checkAuthAndBoot();
     });
   </script>
@@ -2965,6 +3104,67 @@
         <button class="btn-main" style="flex:1.4;margin:0" id="btnSubmitAddDebt" onclick="submitAddDebt()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
           Qarzni saqlash
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       MODAL 3: MIJOZNI TAHRIRLASH
+       ============================================================ -->
+  <div class="custom-modal-backdrop" id="modalEditCustomer" onclick="closeEditCustomerModal(event)">
+    <div class="custom-modal-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Mijozni tahrirlash</h3>
+          <p class="modal-sub">Ism va telefon raqamini yangilash</p>
+        </div>
+        <button class="modal-close-btn" onclick="closeEditCustomerModal()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <input type="hidden" id="edit-customer-id">
+
+        <div class="form-group">
+          <label class="form-label">Ism va Familiya *</label>
+          <div class="input-box">
+            <span class="input-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </span>
+            <input type="text" class="custom-input" id="inp-edit-name" placeholder="Masalan: Aliyev Bobur">
+          </div>
+          <div class="field-error" id="err-edit-name"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Telefon Raqami <span style="font-weight:400;color:var(--text-light);font-size:12px">(ixtiyoriy)</span></label>
+          <div class="input-box">
+            <span class="input-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            </span>
+            <input type="tel" class="custom-input" id="inp-edit-phone" placeholder="+998 90 123 45 67">
+          </div>
+          <div class="field-error" id="err-edit-phone"></div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Qo'shimcha izoh (ixtiyoriy)</label>
+          <div class="input-box">
+            <span class="input-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+            </span>
+            <input type="text" class="custom-input" id="inp-edit-notes" placeholder="Qo'shimcha ma'lumot">
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-subtle" style="flex:1" onclick="closeEditCustomerModal()">Bekor qilish</button>
+        <button class="btn-main" style="flex:1.4;margin:0" id="btnSubmitEditCustomer" onclick="submitEditCustomer()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Saqlash
         </button>
       </div>
     </div>
