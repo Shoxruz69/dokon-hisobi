@@ -14,9 +14,16 @@ from database.queries import (
     get_customer_by_telegram_id,
     get_customer_all_debts,
     add_customer,
-    mark_debt_paid
+    mark_debt_paid,
+    record_customer_payment,
+    add_debt_to_existing_customer
 )
 from utils.validators import validate_phone, validate_amount, validate_date, validate_full_name
+from utils.notifications import (
+    notify_customer_partial_payment,
+    notify_customer_debt_added,
+    notify_customer_debt_paid
+)
 
 logger = logging.getLogger(__name__)
 
@@ -187,11 +194,138 @@ async def handle_mark_paid(request: web.Request):
     if not shop_id:
         return web.json_response({"detail": "shop_id ko'rsatilmadi"}, status=400)
         
-    success = await mark_debt_paid(debt_id, shop_id, admin_id, note)
-    if not success:
+    res = await mark_debt_paid(debt_id, shop_id, admin_id, note)
+    if not res:
         return web.json_response({"detail": "Qarz topilmadi yoki do'kon mos kelmadi"}, status=400)
+
+    # Mijozga bildirishnoma yuborish
+    notified = False
+    try:
+        notified = await notify_customer_debt_paid(
+            customer=res["customer"],
+            shop_name=res["shop_name"],
+            debt_amount=res["paid_amount"],
+            description=res["debt"]["description"],
+            remaining_debt=res["remaining_debt"]
+        )
+    except Exception as e:
+        logger.warning(f"Telegram bildirishnoma xatosi: {e}")
         
-    return web.json_response({"success": True})
+    return web.json_response({
+        "success": True,
+        "paid_amount": res["paid_amount"],
+        "remaining_debt": res["remaining_debt"],
+        "notified": notified
+    })
+
+async def handle_customer_pay(request: web.Request):
+    """POST /api/customer/{customer_id}/pay — Qarzdan ma'lum summani ayirish"""
+    try:
+        customer_id = int(request.match_info.get("customer_id"))
+    except (ValueError, TypeError):
+        return web.json_response({"detail": "Noto'g'ri customer_id"}, status=400)
+
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"detail": "Noto'g'ri JSON format"}, status=400)
+
+    shop_id = data.get("shop_id") or request.headers.get("X-Shop-Id", "").strip().upper()
+    if not shop_id:
+        shop_id = await resolve_shop_id(request)
+
+    amount = data.get("amount")
+    try:
+        amount = float(amount)
+        if amount <= 0:
+            raise ValueError()
+    except Exception:
+        return web.json_response({"detail": "To'lov summasi noto'g'ri"}, status=400)
+
+    note = data.get("note", "Mini App orqali to'landi")
+    admin_id = data.get("admin_id", 0)
+
+    try:
+        result = await record_customer_payment(customer_id, shop_id, amount, admin_id, note)
+    except ValueError as e:
+        return web.json_response({"detail": str(e)}, status=400)
+
+    # Mijozga Telegram orqali bildirishnoma (SMS) yuborish
+    notified = False
+    try:
+        notified = await notify_customer_partial_payment(
+            customer=result["customer"],
+            shop_name=result["shop_name"],
+            paid_amount=result["paid_amount"],
+            remaining_debt=result["remaining_debt"]
+        )
+    except Exception as e:
+        logger.warning(f"Telegram bildirishnoma xatosi: {e}")
+
+    return web.json_response({
+        "success": True,
+        "paid_amount": result["paid_amount"],
+        "remaining_debt": result["remaining_debt"],
+        "notified": notified
+    })
+
+async def handle_customer_add_debt(request: web.Request):
+    """POST /api/customer/{customer_id}/add-debt — Mijozga yangi qarz qo'shish"""
+    try:
+        customer_id = int(request.match_info.get("customer_id"))
+    except (ValueError, TypeError):
+        return web.json_response({"detail": "Noto'g'ri customer_id"}, status=400)
+
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"detail": "Noto'g'ri JSON format"}, status=400)
+
+    shop_id = data.get("shop_id") or request.headers.get("X-Shop-Id", "").strip().upper()
+    if not shop_id:
+        shop_id = await resolve_shop_id(request)
+
+    amount = data.get("amount")
+    description = (data.get("description") or "").strip()
+    due_date = (data.get("due_date") or "").strip()
+    notes = data.get("notes")
+
+    is_amt_ok, amt_val = validate_amount(amount)
+    if not is_amt_ok:
+        return web.json_response({"detail": amt_val}, status=400)
+
+    if len(description) < 2:
+        return web.json_response({"detail": "Nima olinganini yozing"}, status=400)
+
+    is_date_ok, date_val = validate_date(due_date)
+    if not is_date_ok:
+        return web.json_response({"detail": date_val}, status=400)
+
+    try:
+        result = await add_debt_to_existing_customer(customer_id, shop_id, amt_val, description, date_val, notes)
+    except ValueError as e:
+        return web.json_response({"detail": str(e)}, status=400)
+
+    # Mijozga Telegram orqali bildirishnoma (SMS) yuborish
+    notified = False
+    try:
+        notified = await notify_customer_debt_added(
+            customer=result["customer"],
+            shop_name=result["shop_name"],
+            amount=result["amount"],
+            description=result["description"],
+            due_date=result["due_date"],
+            total_debt=result["total_debt"]
+        )
+    except Exception as e:
+        logger.warning(f"Telegram bildirishnoma xatosi: {e}")
+
+    return web.json_response({
+        "success": True,
+        "debt_id": result["debt_id"],
+        "total_debt": result["total_debt"],
+        "notified": notified
+    })
 
 async def handle_get_me(request: web.Request):
     """Foydalanuvchi roli va ma'lumotlarini aniqlash (Admin yoki Mijoz)"""
@@ -214,10 +348,9 @@ async def handle_get_me(request: web.Request):
     if user_id_str and user_id_str.isdigit():
         uid = int(user_id_str)
         admin = await get_admin_by_telegram_id(uid)
-        if not admin and hasattr(settings, "ADMIN_TELEGRAM_ID"):
+        if not admin and settings.is_admin_id(uid):
             try:
-                if uid == int(settings.ADMIN_TELEGRAM_ID):
-                    admin = await get_first_active_admin()
+                admin = await get_first_active_admin()
             except Exception:
                 pass
                 
@@ -291,6 +424,8 @@ def create_web_app() -> web.Application:
     app.router.add_get("/api/customers/", handle_get_customers)
     app.router.add_get("/api/customers/{shop_id}", handle_get_customers)
     app.router.add_get("/api/customer/{customer_id}", handle_get_customer_detail)
+    app.router.add_post("/api/customer/{customer_id}/pay", handle_customer_pay)
+    app.router.add_post("/api/customer/{customer_id}/add-debt", handle_customer_add_debt)
     app.router.add_post("/api/customers/add", handle_add_customer)
     app.router.add_post("/api/debt/{debt_id}/pay", handle_mark_paid)
     

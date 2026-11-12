@@ -56,11 +56,7 @@ async def cmd_start(message: Message, state: FSMContext, admin: dict = None):
     await state.clear()
     user_id = message.from_user.id
     
-    is_env_admin = False
-    try:
-        is_env_admin = (int(user_id) == int(settings.ADMIN_TELEGRAM_ID))
-    except Exception:
-        pass
+    is_env_admin = settings.is_admin_id(user_id)
 
     # 1. ADMIN TEKSHIRUVI
     if not admin:
@@ -239,7 +235,7 @@ async def process_admin_phone(message: Message, state: FSMContext):
 async def cmd_edit_shop(message: Message, state: FSMContext):
     user_id = message.from_user.id
     admin = await get_admin_by_telegram_id(user_id)
-    if not admin and str(user_id) == str(settings.ADMIN_TELEGRAM_ID):
+    if not admin and settings.is_admin_id(user_id):
         admin = await get_first_active_admin()
     if not admin:
         await message.answer("Sizda do'kon boshqaruviga ruxsat yo'q.")
@@ -283,11 +279,7 @@ async def cmd_setadmin(message: Message):
     user_id = message.from_user.id
     admin = await get_admin_by_telegram_id(user_id)
     
-    is_env_admin = False
-    try:
-        is_env_admin = (int(user_id) == int(settings.ADMIN_TELEGRAM_ID))
-    except Exception:
-        pass
+    is_env_admin = settings.is_admin_id(user_id)
         
     if not is_env_admin and not admin:
         await message.answer("Sizda bunday amalni bajarish huquqi yo'q.")

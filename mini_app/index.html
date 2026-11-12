@@ -918,6 +918,120 @@
     .toast-alert.toast-error {
       background: var(--danger);
     }
+
+    /* CUSTOMER ACTION BUTTONS & MODALS */
+    .btn-customer-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 14px;
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: var(--shadow-sm);
+    }
+    .btn-customer-action svg {
+      flex-shrink: 0;
+    }
+    .btn-action-pay {
+      background: var(--primary);
+      color: #ffffff;
+    }
+    .btn-action-pay:hover {
+      background: var(--primary-dark);
+      transform: translateY(-1px);
+    }
+    .btn-action-add {
+      background: #1e293b;
+      color: #ffffff;
+    }
+    .btn-action-add:hover {
+      background: #0f172a;
+      transform: translateY(-1px);
+    }
+
+    .custom-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 1000;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      transition: opacity 0.25s ease;
+      opacity: 0;
+    }
+    .custom-modal-backdrop.show {
+      display: flex;
+      opacity: 1;
+    }
+    .custom-modal-card {
+      background: var(--bg-card);
+      border-top-left-radius: 20px;
+      border-top-right-radius: 20px;
+      width: 100%;
+      max-width: 500px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.15);
+      animation: slideUpModal 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: hidden;
+    }
+    @keyframes slideUpModal {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--text-main);
+      margin: 0;
+    }
+    .modal-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .modal-close-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      border-radius: var(--radius-sm);
+    }
+    .modal-close-btn:hover {
+      background: var(--bg-body);
+      color: var(--text-main);
+    }
+    .modal-body {
+      padding: 18px 20px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .modal-footer {
+      display: flex;
+      gap: 10px;
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-body);
+    }
   </style>
 </head>
 <body>
@@ -1584,6 +1698,24 @@
                 ${formatMoney(data.total_debt)}
               </div>
             </div>
+
+            <!-- IKKITA ASOSIY AMAL TUGMASI: TO'LOV QABUL QILISH VA YANA QARZ QO'SHISH -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">
+              <button class="btn-customer-action btn-action-pay" onclick="openPaymentModal(${data.id}, '${escHtml(data.full_name)}', ${data.total_debt})">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+                <span>To'lov olish</span>
+              </button>
+
+              <button class="btn-customer-action btn-action-add" onclick="openAddDebtModal(${data.id}, '${escHtml(data.full_name)}')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span>Qarz qo'shish</span>
+              </button>
+            </div>
           </div>
           
           <h4 class="section-title" style="margin-bottom:12px">Qarzlar Tarixi (${data.debts?.length || 0})</h4>
@@ -1599,14 +1731,197 @@
       haptic('notification', 'success');
 
       try {
-        await apiRequest(`/api/debt/${debtId}/pay`, 'POST', {
+        const res = await apiRequest(`/api/debt/${debtId}/pay`, 'POST', {
           shop_id: shopData.shopId,
           note: "Mini App orqali yopildi"
         });
-        showToast("Qarz to'landi deb belgilandi", "success");
+        showToast("Qarz to'landi deb belgilandi!", "success");
         if (activeCustomerId) openCustomerDetail(activeCustomerId);
+        loadCustomers();
       } catch (err) {
         showToast(err.message, "error");
+      }
+    }
+
+    // ============================================================
+    // TO'LOV QABUL QILISH MODAL FUNKSIYALARI
+    // ============================================================
+    let activeCustomerDebtAmount = 0;
+    let activeCustomerName = '';
+
+    function openPaymentModal(customerId, customerName, totalDebt) {
+      activeCustomerId = customerId;
+      activeCustomerDebtAmount = totalDebt;
+      activeCustomerName = customerName;
+
+      document.getElementById('payModalCustomerInfo').textContent = `Mijoz: ${customerName}`;
+      document.getElementById('payModalTotalDebt').textContent = formatMoney(totalDebt);
+      document.getElementById('inp-pay-amount').value = '';
+      document.getElementById('inp-pay-note').value = '';
+      clearFieldError('pay-amount');
+
+      const modal = document.getElementById('modalPayment');
+      modal.classList.add('show');
+      haptic('impact', 'medium');
+      setTimeout(() => {
+        const inp = document.getElementById('inp-pay-amount');
+        if (inp) inp.focus();
+      }, 200);
+    }
+
+    function closePaymentModal(e) {
+      if (e && e.target && !e.target.classList.contains('custom-modal-backdrop') && !e.target.classList.contains('modal-close-btn') && !e.target.classList.contains('btn-subtle')) return;
+      document.getElementById('modalPayment').classList.remove('show');
+      haptic('impact', 'light');
+    }
+
+    function setPayPercent(pct) {
+      const amt = Math.round(activeCustomerDebtAmount * pct);
+      document.getElementById('inp-pay-amount').value = amt > 0 ? amt : '';
+      haptic('impact', 'light');
+    }
+
+    function addPayQuick(val) {
+      const el = document.getElementById('inp-pay-amount');
+      const cur = parseFloat(el.value) || 0;
+      el.value = cur + val;
+      haptic('impact', 'light');
+    }
+
+    async function submitPayment() {
+      const amountVal = parseFloat(document.getElementById('inp-pay-amount').value);
+      const noteVal = document.getElementById('inp-pay-note').value.trim();
+
+      if (!amountVal || amountVal <= 0) {
+        showFieldError('pay-amount', 'To\'g\'ri summa kiriting');
+        return;
+      }
+      clearFieldError('pay-amount');
+
+      const btn = document.getElementById('btnSubmitPayment');
+      btn.disabled = true;
+      btn.innerHTML = 'Kiritilmoqda...';
+
+      try {
+        const res = await apiRequest(`/api/customer/${activeCustomerId}/pay`, 'POST', {
+          shop_id: shopData.shopId,
+          amount: amountVal,
+          note: noteVal || 'Mini App orqali to\'landi'
+        });
+
+        haptic('notification', 'success');
+        document.getElementById('modalPayment').classList.remove('show');
+        showToast(`${formatMoney(res.paid_amount)} to'landi! Qolgan qarz: ${formatMoney(res.remaining_debt)}`, 'success');
+
+        openCustomerDetail(activeCustomerId);
+        loadCustomers();
+      } catch (err) {
+        haptic('notification', 'error');
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> To'lovni kiritish`;
+      }
+    }
+
+    // ============================================================
+    // MAVJUD MIJOZGA YANGI QARZ QO'SHISH MODAL FUNKSIYALARI
+    // ============================================================
+    function openAddDebtModal(customerId, customerName) {
+      activeCustomerId = customerId;
+      activeCustomerName = customerName;
+
+      document.getElementById('addDebtModalCustomerInfo').textContent = `Mijoz: ${customerName}`;
+      document.getElementById('inp-adddebt-amount').value = '';
+      document.getElementById('inp-adddebt-desc').value = '';
+      document.getElementById('inp-adddebt-notes').value = '';
+      clearFieldError('adddebt-amount');
+      clearFieldError('adddebt-desc');
+      clearFieldError('adddebt-date');
+
+      // Standart 15 kunlik to'lov muddati
+      const d = new Date();
+      d.setDate(d.getDate() + 15);
+      document.getElementById('inp-adddebt-date').value = d.toISOString().split('T')[0];
+
+      const modal = document.getElementById('modalAddDebt');
+      modal.classList.add('show');
+      haptic('impact', 'medium');
+      setTimeout(() => {
+        const inp = document.getElementById('inp-adddebt-amount');
+        if (inp) inp.focus();
+      }, 200);
+    }
+
+    function closeAddDebtModal(e) {
+      if (e && e.target && !e.target.classList.contains('custom-modal-backdrop') && !e.target.classList.contains('modal-close-btn') && !e.target.classList.contains('btn-subtle')) return;
+      document.getElementById('modalAddDebt').classList.remove('show');
+      haptic('impact', 'light');
+    }
+
+    function addDebtQuickAmount(val) {
+      const el = document.getElementById('inp-adddebt-amount');
+      const cur = parseFloat(el.value) || 0;
+      el.value = cur + val;
+      haptic('impact', 'light');
+    }
+
+    function setAddDebtQuickDays(days) {
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+      document.getElementById('inp-adddebt-date').value = d.toISOString().split('T')[0];
+      haptic('impact', 'light');
+    }
+
+    async function submitAddDebt() {
+      const amountVal = parseFloat(document.getElementById('inp-adddebt-amount').value);
+      const descVal = document.getElementById('inp-adddebt-desc').value.trim();
+      const dateVal = document.getElementById('inp-adddebt-date').value;
+      const notesVal = document.getElementById('inp-adddebt-notes').value.trim();
+
+      let valid = true;
+      if (!amountVal || amountVal < 100) {
+        showFieldError('adddebt-amount', 'Summa kamida 100 so\'m bo\'lsin');
+        valid = false;
+      } else clearFieldError('adddebt-amount');
+
+      if (!descVal || descVal.length < 2) {
+        showFieldError('adddebt-desc', 'Mahsulot nomini yozing');
+        valid = false;
+      } else clearFieldError('adddebt-desc');
+
+      if (!dateVal) {
+        showFieldError('adddebt-date', 'To\'lov muddatini tanlang');
+        valid = false;
+      } else clearFieldError('adddebt-date');
+
+      if (!valid) return;
+
+      const btn = document.getElementById('btnSubmitAddDebt');
+      btn.disabled = true;
+      btn.innerHTML = 'Saqlanmoqda...';
+
+      try {
+        const res = await apiRequest(`/api/customer/${activeCustomerId}/add-debt`, 'POST', {
+          shop_id: shopData.shopId,
+          amount: amountVal,
+          description: descVal,
+          due_date: dateVal,
+          notes: notesVal
+        });
+
+        haptic('notification', 'success');
+        document.getElementById('modalAddDebt').classList.remove('show');
+        showToast(`${formatMoney(amountVal)} qarz qo'shildi! Jami: ${formatMoney(res.total_debt)}`, 'success');
+
+        openCustomerDetail(activeCustomerId);
+        loadCustomers();
+      } catch (err) {
+        haptic('notification', 'error');
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Qarzni saqlash`;
       }
     }
 
@@ -1964,5 +2279,155 @@
       checkAuthAndBoot();
     });
   </script>
+  <!-- ============================================================
+       MODAL 1: TO'LOV QABUL QILISH (QISMAN / TO'LIQ)
+       ============================================================ -->
+  <div class="custom-modal-backdrop" id="modalPayment" onclick="closePaymentModal(event)">
+    <div class="custom-modal-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">To'lov qabul qilish</h3>
+          <p class="modal-sub" id="payModalCustomerInfo">Mijoz: —</p>
+        </div>
+        <button class="modal-close-btn" onclick="closePaymentModal()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div style="background:var(--bg-body);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:13px;color:var(--text-muted);font-weight:600">Joriy qarzdorlik:</span>
+          <b style="font-size:16px;color:var(--danger);font-weight:800" id="payModalTotalDebt">0 so'm</b>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">To'langan summa (so'm) *</label>
+          <div class="input-box">
+            <span class="input-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+            </span>
+            <input type="number" class="custom-input" id="inp-pay-amount" placeholder="Masalan: 50000" inputmode="numeric">
+          </div>
+          <div class="field-error" id="err-pay-amount"></div>
+        </div>
+
+        <div class="quick-pills" style="margin-bottom:14px">
+          <button type="button" class="pill-btn" onclick="setPayPercent(0.5)">50% to'lash</button>
+          <button type="button" class="pill-btn" onclick="setPayPercent(1.0)">To'liq to'lash</button>
+          <button type="button" class="pill-btn" onclick="addPayQuick(50000)">+50 000</button>
+          <button type="button" class="pill-btn" onclick="addPayQuick(100000)">+100 000</button>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Izoh (ixtiyoriy)</label>
+          <div class="input-box">
+            <span class="input-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+            </span>
+            <input type="text" class="custom-input" id="inp-pay-note" placeholder="Masalan: Naqd yoki Click orqali">
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-subtle" style="flex:1" onclick="closePaymentModal()">Bekor qilish</button>
+        <button class="btn-main" style="flex:1.4;margin:0" id="btnSubmitPayment" onclick="submitPayment()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          To'lovni kiritish
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       MODAL 2: YANA QARZ QO'SHISH (MAVJUD MIJOZGA)
+       ============================================================ -->
+  <div class="custom-modal-backdrop" id="modalAddDebt" onclick="closeAddDebtModal(event)">
+    <div class="custom-modal-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Yangi qarz qo'shish</h3>
+          <p class="modal-sub" id="addDebtModalCustomerInfo">Mijoz: —</p>
+        </div>
+        <button class="modal-close-btn" onclick="closeAddDebtModal()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Qarz summasi (so'm) *</label>
+          <div class="input-box">
+            <span class="input-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+            </span>
+            <input type="number" class="custom-input" id="inp-adddebt-amount" placeholder="Masalan: 100000" inputmode="numeric">
+          </div>
+          <div class="field-error" id="err-adddebt-amount"></div>
+        </div>
+
+        <div class="quick-pills" style="margin-bottom:14px">
+          <button type="button" class="pill-btn" onclick="addDebtQuickAmount(50000)">+50 000</button>
+          <button type="button" class="pill-btn" onclick="addDebtQuickAmount(100000)">+100 000</button>
+          <button type="button" class="pill-btn" onclick="addDebtQuickAmount(200000)">+200 000</button>
+          <button type="button" class="pill-btn" onclick="addDebtQuickAmount(500000)">+500 000</button>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Nima olingan (Mahsulot) *</label>
+          <div class="input-box">
+            <span class="input-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              </svg>
+            </span>
+            <input type="text" class="custom-input" id="inp-adddebt-desc" placeholder="Masalan: 2 qop un, 5L yog'">
+          </div>
+          <div class="field-error" id="err-adddebt-desc"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">To'lov muddati *</label>
+          <div class="input-box">
+            <span class="input-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+            </span>
+            <input type="date" class="custom-input" id="inp-adddebt-date">
+          </div>
+          <div class="field-error" id="err-adddebt-date"></div>
+        </div>
+
+        <div class="quick-pills" style="margin-bottom:14px">
+          <button type="button" class="pill-btn" onclick="setAddDebtQuickDays(7)">+7 kun</button>
+          <button type="button" class="pill-btn" onclick="setAddDebtQuickDays(15)">+15 kun</button>
+          <button type="button" class="pill-btn" onclick="setAddDebtQuickDays(30)">+1 oy</button>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Qo'shimcha izoh (ixtiyoriy)</label>
+          <div class="input-box">
+            <span class="input-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+            </span>
+            <input type="text" class="custom-input" id="inp-adddebt-notes" placeholder="Qo'shimcha ma'lumot">
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-subtle" style="flex:1" onclick="closeAddDebtModal()">Bekor qilish</button>
+        <button class="btn-main" style="flex:1.4;margin:0" id="btnSubmitAddDebt" onclick="submitAddDebt()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Qarzni saqlash
+        </button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

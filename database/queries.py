@@ -235,15 +235,15 @@ async def link_customer_telegram(phone: str, telegram_id: int) -> bool:
 # ============================================================
 
 async def mark_debt_paid(debt_id: int, shop_id: Optional[str] = None, 
-                         admin_id: int = 0, note: Optional[str] = None) -> bool:
+                         admin_id: int = 0, note: Optional[str] = None) -> Optional[dict]:
     """Qarzni to'langan deb belgilash"""
     if shop_id:
-        debt = await db_fetch_one("SELECT id, customer_id, amount FROM debts WHERE id = ? AND shop_id = ?", debt_id, shop_id)
+        debt = await db_fetch_one("SELECT * FROM debts WHERE id = ? AND shop_id = ?", debt_id, shop_id)
     else:
-        debt = await db_fetch_one("SELECT id, customer_id, amount FROM debts WHERE id = ?", debt_id)
+        debt = await db_fetch_one("SELECT * FROM debts WHERE id = ?", debt_id)
 
     if not debt:
-        return False
+        return None
 
     customer_id = debt["customer_id"]
     amount = float(debt["amount"])
@@ -270,7 +270,17 @@ async def mark_debt_paid(debt_id: int, shop_id: Optional[str] = None,
     new_total = float(total_row["total"]) if total_row else 0.0
     await db_execute("UPDATE customers SET total_debt = ? WHERE id = ?", new_total, customer_id)
 
-    return True
+    cust = await db_fetch_one("SELECT * FROM customers WHERE id = ?", customer_id)
+    admin = await get_admin_by_shop_id(debt["shop_id"])
+
+    return {
+        "success": True,
+        "debt": debt,
+        "customer": cust,
+        "shop_name": admin["shop_name"] if admin else "Do'kon",
+        "paid_amount": amount,
+        "remaining_debt": new_total
+    }
 
 async def get_customer_all_debts(customer_id: int) -> List[dict]:
     """Mijozning barcha qarzlari (faol va to'langan)"""
@@ -384,3 +394,130 @@ async def delete_debt(debt_id: int, shop_id: str) -> bool:
     new_total = float(total_row["total"]) if total_row else 0.0
     await db_execute("UPDATE customers SET total_debt = ? WHERE id = ?", new_total, customer_id)
     return True
+
+# ============================================================
+# 8. QISMAN TO'LOV VA MAVJUD MIJOZGA QARZ QO'SHISH
+# ============================================================
+
+async def record_customer_payment(
+    customer_id: int,
+    shop_id: str,
+    pay_amount: float,
+    admin_id: int = 0,
+    note: Optional[str] = None
+) -> dict:
+    """Mijoz qarzidan qisman yoki to'liq to'lovni ayirib tashlash"""
+    cust = await db_fetch_one("SELECT * FROM customers WHERE id = ? AND shop_id = ?", customer_id, shop_id)
+    if not cust:
+        raise ValueError("Mijoz topilmadi")
+
+    total_debt = float(cust.get("total_debt") or 0.0)
+    if total_debt <= 0:
+        raise ValueError("Mijozda faol qarzdorlik mavjud emas")
+
+    pay_amount = float(pay_amount)
+    if pay_amount <= 0:
+        raise ValueError("To'lov summasi 0 dan katta bo'lishi kerak")
+
+    actual_pay = min(pay_amount, total_debt)
+    remaining_to_deduct = actual_pay
+    now_dt = datetime.now()
+    default_note = note or "Qisman to'lov"
+
+    active_debts = await db_fetch_all("""
+        SELECT * FROM debts 
+        WHERE customer_id = ? AND shop_id = ? AND status IN ('active', 'overdue')
+        ORDER BY debt_date ASC, id ASC
+    """, customer_id, shop_id)
+
+    for d in active_debts:
+        if remaining_to_deduct <= 0:
+            break
+            
+        d_id = d["id"]
+        d_amount = float(d["amount"])
+        
+        if remaining_to_deduct >= d_amount:
+            await db_execute("""
+                UPDATE debts 
+                SET status = 'paid', paid_date = ?, paid_amount = ?, admin_note = ?, updated_at = ?
+                WHERE id = ?
+            """, now_dt, d_amount, default_note, now_dt, d_id)
+            
+            await db_execute_insert("""
+                INSERT INTO payment_history (debt_id, amount, paid_at, note, admin_id)
+                VALUES (?, ?, ?, ?, ?)
+            """, d_id, d_amount, now_dt, default_note, admin_id)
+            
+            remaining_to_deduct -= d_amount
+        else:
+            new_amount = round(d_amount - remaining_to_deduct, 2)
+            await db_execute("""
+                UPDATE debts 
+                SET amount = ?, updated_at = ?
+                WHERE id = ?
+            """, new_amount, now_dt, d_id)
+            
+            await db_execute_insert("""
+                INSERT INTO payment_history (debt_id, amount, paid_at, note, admin_id)
+                VALUES (?, ?, ?, ?, ?)
+            """, d_id, remaining_to_deduct, now_dt, default_note, admin_id)
+            
+            remaining_to_deduct = 0
+            break
+
+    total_row = await db_fetch_one(
+        "SELECT COALESCE(SUM(amount), 0) as total FROM debts WHERE customer_id = ? AND status IN ('active', 'overdue')",
+        customer_id
+    )
+    new_total = float(total_row["total"]) if total_row else 0.0
+    await db_execute("UPDATE customers SET total_debt = ? WHERE id = ?", new_total, customer_id)
+
+    admin = await get_admin_by_shop_id(shop_id)
+
+    return {
+        "customer": cust,
+        "shop_name": admin["shop_name"] if admin else "Do'kon",
+        "paid_amount": actual_pay,
+        "remaining_debt": new_total
+    }
+
+async def add_debt_to_existing_customer(
+    customer_id: int,
+    shop_id: str,
+    amount: float,
+    description: str,
+    due_date: str,
+    notes: Optional[str] = None
+) -> dict:
+    """Mavjud mijozga yangi qarz qo'shish"""
+    cust = await db_fetch_one("SELECT * FROM customers WHERE id = ? AND shop_id = ?", customer_id, shop_id)
+    if not cust:
+        raise ValueError("Mijoz topilmadi")
+
+    d_date = date.today()
+    d_due = date.fromisoformat(due_date) if isinstance(due_date, str) else due_date
+
+    debt_id = await db_execute_insert("""
+        INSERT INTO debts (customer_id, shop_id, amount, description, debt_date, due_date, status, admin_note)
+        VALUES (?, ?, ?, ?, ?, ?, 'active', ?)
+    """, customer_id, shop_id, float(amount), description.strip(), d_date, d_due, notes)
+
+    total_row = await db_fetch_one(
+        "SELECT COALESCE(SUM(amount), 0) as total FROM debts WHERE customer_id = ? AND status IN ('active', 'overdue')",
+        customer_id
+    )
+    new_total = float(total_row["total"]) if total_row else float(amount)
+    await db_execute("UPDATE customers SET total_debt = ? WHERE id = ?", new_total, customer_id)
+
+    admin = await get_admin_by_shop_id(shop_id)
+
+    return {
+        "customer": cust,
+        "shop_name": admin["shop_name"] if admin else "Do'kon",
+        "debt_id": debt_id,
+        "amount": float(amount),
+        "description": description.strip(),
+        "due_date": str(d_due),
+        "total_debt": new_total
+    }
