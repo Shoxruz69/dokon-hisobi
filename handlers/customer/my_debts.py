@@ -37,10 +37,12 @@ async def show_my_debts(event: Message | CallbackQuery):
     for cust in customers:
         debts = await get_customer_active_debts(cust["id"])
         view_text = build_customer_debts_view(cust, debts)
+        inline_kb = get_customer_inline_kb(cust["id"])
         if isinstance(event, CallbackQuery):
-            await event.message.answer(view_text, parse_mode="HTML", reply_markup=get_customer_inline_kb())
+            await event.message.answer(view_text, parse_mode="HTML", reply_markup=inline_kb)
         else:
-            await event.answer(view_text, parse_mode="HTML", reply_markup=get_customer_inline_kb())
+            await event.answer(view_text, parse_mode="HTML", reply_markup=inline_kb)
+            await event.answer("👇 Shaxsiy hisob menyusi:", reply_markup=get_customer_main_kb(cust["id"]))
 
 @router.message(F.text.contains("bog'lanish") | F.text.contains("boglanish"))
 async def contact_shop(message: Message):

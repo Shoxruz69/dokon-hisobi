@@ -21,20 +21,24 @@ logger = logging.getLogger(__name__)
 # ============================================================
 def resolve_admin_label(admin_id: Optional[int], custom_name: Optional[str] = None) -> str:
     """Admin ID si yoki ismini chiroyli qilib qaytarish"""
-    if custom_name and custom_name.strip() and custom_name.strip() != "None":
-        return custom_name.strip()
-    if not admin_id:
-        return "Admin"
-    try:
-        aid = int(admin_id)
-    except Exception:
-        return "Admin"
     known = {
-        6876312568: "Shoxruz Rasulov",
-        264625389: "Admin (264625389)",
-        6715367177: "Admin (6715367177)"
+        264625389: "Rustamjon",
+        6715367177: "Abdulhamid"
     }
-    return known.get(aid, f"Admin ({aid})")
+    try:
+        aid = int(admin_id) if admin_id else None
+    except Exception:
+        aid = None
+
+    if aid and aid in known:
+        return known[aid]
+
+    if custom_name and custom_name.strip() and custom_name.strip() not in ("None", "Admin", "null", ""):
+        return custom_name.strip()
+
+    if aid:
+        return known.get(aid, "Rustamjon")
+    return "Rustamjon"
 
 # ============================================================
 # 1. ADMIN SO'ROVLARI
@@ -47,6 +51,7 @@ async def get_admin_by_telegram_id(telegram_id: int) -> Optional[dict]:
         telegram_id
     )
     if admin:
+        admin["full_name"] = resolve_admin_label(telegram_id, admin.get("full_name"))
         return admin
 
     # Agar bazada bu telegram_id bo'lmasa, lekin settings.is_admin_id() bo'lsa
@@ -489,27 +494,16 @@ async def get_detailed_stats(shop_id: str, target_date: Optional[str] = None) ->
 
     month_start = t_date.replace(day=1)
 
-    # Barcha statistik so'rovlarni PARALLEL ravishda yuborish (8 karra tezroq)
+    # Barcha statistik so'rovlarni PARALLEL ravishda yuborish (bir necha barobar tezkor)
     (
-        given_row,
         given_list,
-        paid_row,
         paid_list,
         month_given,
         month_paid,
         overall_row,
         admin
     ) = await asyncio.gather(
-        # 1. Tanlangan kungi berilgan qarzlar jami
-        db_fetch_one("""
-            SELECT 
-                COUNT(DISTINCT customer_id) as cust_count,
-                COUNT(id) as debt_count,
-                COALESCE(SUM(amount), 0) as total_sum
-            FROM debts 
-            WHERE shop_id = ? AND debt_date = ?
-        """, shop_id, t_date),
-        # 2. Tanlangan kungi berilgan qarzlar ro'yxati
+        # 1. Tanlangan kungi berilgan qarzlar ro'yxati
         db_fetch_all("""
             SELECT d.id, d.customer_id, d.amount, d.description, d.due_date, d.created_at,
                    d.created_by_admin_id, d.created_by_admin_name,
@@ -519,17 +513,7 @@ async def get_detailed_stats(shop_id: str, target_date: Optional[str] = None) ->
             WHERE d.shop_id = ? AND d.debt_date = ?
             ORDER BY d.id DESC
         """, shop_id, t_date),
-        # 3. Tanlangan kungi undirilgan to'lovlar jami
-        db_fetch_one("""
-            SELECT 
-                COUNT(DISTINCT d.customer_id) as cust_count,
-                COUNT(ph.id) as pay_count,
-                COALESCE(SUM(ph.amount), 0) as total_sum
-            FROM payment_history ph
-            JOIN debts d ON d.id = ph.debt_id
-            WHERE d.shop_id = ? AND DATE(ph.paid_at) = ?
-        """, shop_id, t_date),
-        # 4. Tanlangan kungi undirilgan to'lovlar ro'yxati
+        # 2. Tanlangan kungi undirilgan to'lovlar ro'yxati
         db_fetch_all("""
             SELECT ph.id, ph.debt_id, ph.amount, ph.paid_at, ph.note, ph.admin_id, ph.admin_name,
                    d.customer_id, d.description as debt_description,
@@ -540,7 +524,7 @@ async def get_detailed_stats(shop_id: str, target_date: Optional[str] = None) ->
             WHERE d.shop_id = ? AND DATE(ph.paid_at) = ?
             ORDER BY ph.id DESC
         """, shop_id, t_date),
-        # 5. Oylik berilgan qarzlar
+        # 3. Oylik berilgan qarzlar
         db_fetch_one("""
             SELECT 
                 COUNT(DISTINCT customer_id) as cust_count,
@@ -549,7 +533,7 @@ async def get_detailed_stats(shop_id: str, target_date: Optional[str] = None) ->
             FROM debts 
             WHERE shop_id = ? AND debt_date >= ?
         """, shop_id, month_start),
-        # 6. Oylik undirilgan to'lovlar
+        # 4. Oylik undirilgan to'lovlar
         db_fetch_one("""
             SELECT 
                 COUNT(DISTINCT d.customer_id) as cust_count,
@@ -559,7 +543,7 @@ async def get_detailed_stats(shop_id: str, target_date: Optional[str] = None) ->
             JOIN debts d ON d.id = ph.debt_id
             WHERE d.shop_id = ? AND DATE(ph.paid_at) >= ?
         """, shop_id, month_start),
-        # 7. Umumiy ko'rsatkichlar
+        # 5. Umumiy ko'rsatkichlar
         db_fetch_one("""
             SELECT 
                 COUNT(DISTINCT c.id) as total_customers,
@@ -572,9 +556,20 @@ async def get_detailed_stats(shop_id: str, target_date: Optional[str] = None) ->
             LEFT JOIN debts d ON d.customer_id = c.id
             WHERE c.shop_id = ?
         """, shop_id),
-        # 8. Do'kon ma'lumotlari
+        # 6. Do'kon ma'lumotlari
         get_admin_by_shop_id(shop_id)
     )
+
+    given_row = {
+        "cust_count": len(set(d["customer_id"] for d in (given_list or []))),
+        "debt_count": len(given_list or []),
+        "total_sum": sum(float(d.get("amount") or 0) for d in (given_list or []))
+    }
+    paid_row = {
+        "cust_count": len(set(p["customer_id"] for p in (paid_list or []))),
+        "pay_count": len(paid_list or []),
+        "total_sum": sum(float(p.get("amount") or 0) for p in (paid_list or []))
+    }
 
     shop_name = admin["shop_name"] if admin else "Do'kon"
 

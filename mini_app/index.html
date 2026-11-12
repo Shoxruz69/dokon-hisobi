@@ -9,7 +9,8 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"></noscript>
   
   <style>
     /* ============================================================
@@ -1178,7 +1179,7 @@
   <!-- ============================================================
        SCREEN: DASHBOARD
        ============================================================ -->
-  <main class="screen active" id="screen-dashboard">
+  <main class="screen" id="screen-dashboard">
     <!-- HERO CARD -->
     <div class="hero-card">
       <div class="hero-top">
@@ -1470,8 +1471,8 @@
   <!-- ============================================================
        BOTTOM NAVIGATION
        ============================================================ -->
-  <nav class="bottom-nav" id="bottomNav">
-    <button class="nav-item active" id="nav-dashboard" onclick="showScreen('dashboard')">
+  <nav class="bottom-nav" id="bottomNav" style="display:none">
+    <button class="nav-item" id="nav-dashboard" onclick="showScreen('dashboard')">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
         <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
@@ -1526,6 +1527,21 @@
     const urlParams = new URLSearchParams(window.location.search);
     shopData.shopId = urlParams.get('shop_id') || tg?.initDataUnsafe?.start_param || '';
 
+    // ============================================================
+    // TEZKOR MAHALLIY KESH (0.01s da yuklanish uchun)
+    // ============================================================
+    function getLocalCache(key) {
+      try {
+        const val = localStorage.getItem(key);
+        return val ? JSON.parse(val) : null;
+      } catch (e) { return null; }
+    }
+    function setLocalCache(key, data) {
+      try {
+        localStorage.setItem(key, JSON.stringify(data));
+      } catch (e) {}
+    }
+
     function haptic(type = 'impact', style = 'light') {
       try {
         if (tg?.HapticFeedback) {
@@ -1558,9 +1574,9 @@
     }
 
     // ============================================================
-    // NAVIGATION
+    // NAVIGATION (0 MS INSTANT SWITCHING)
     // ============================================================
-    function showScreen(name) {
+    function showScreen(name, triggerLoad = true) {
       currentScreen = name;
       haptic('impact', 'light');
 
@@ -1573,17 +1589,19 @@
       const nav = document.getElementById(`nav-${name}`);
       if (nav) nav.classList.add('active');
 
-      if (name === 'dashboard') loadDashboard();
-      if (name === 'customers') loadCustomers();
-      if (name === 'stats') loadStats();
-      if (name === 'add') resetForm();
+      if (triggerLoad) {
+        if (name === 'dashboard') loadDashboard();
+        if (name === 'customers') loadCustomers();
+        if (name === 'stats') loadStats();
+        if (name === 'add') resetForm();
+      }
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function refreshCurrentScreen() {
       haptic('impact', 'medium');
-      showScreen(currentScreen);
+      showScreen(currentScreen, true);
       showToast('Yangilandi', 'success');
     }
 
@@ -1613,9 +1631,13 @@
     }
 
     async function loadDashboard(force = false) {
-      // 1. Agar xotirada bo'lsa darhol (0 ms) chizish — kutish va aylanuvchi doira bo'lmaydi!
-      if (cachedStats) {
-        renderDashboardCards(cachedStats, allCustomers);
+      // 1. Agar xotirada yoki LocalStorage da bo'lsa darhol (0 ms) chizish — aylanuvchi spinner bo'lmaydi!
+      const cached = cachedStats || getLocalCache('dh_stats');
+      const cachedCusts = (allCustomers && allCustomers.length) ? allCustomers : (getLocalCache('dh_customers') || []);
+      if (cached) {
+        cachedStats = cached;
+        allCustomers = cachedCusts;
+        renderDashboardCards(cached, cachedCusts);
       }
       try {
         const [stats, custs] = await Promise.all([
@@ -1624,19 +1646,19 @@
         ]);
         cachedStats = stats;
         allCustomers = custs;
+        setLocalCache('dh_stats', stats);
+        setLocalCache('dh_customers', custs);
         renderDashboardCards(stats, custs);
       } catch (err) {
         if (!cachedStats) {
-          document.getElementById('dashboardRecentList').innerHTML = `
-            <div class="empty-box">
-              <div class="empty-icon-wrap">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                </svg>
-              </div>
-              <div class="empty-title">Hozircha mijozlar yo'q</div>
-              <div class="empty-sub">Birinchi qarzdor mijozni qo'shing</div>
-            </div>`;
+          const listEl = document.getElementById('dashboardRecentList');
+          if (listEl) {
+            listEl.innerHTML = `
+              <div class="empty-box">
+                <div class="empty-title">Aloqa sekin yoki uzildi</div>
+                <div class="empty-sub">Internet aloqasini tekshiring</div>
+              </div>`;
+          }
         }
       }
     }
@@ -1664,8 +1686,10 @@
     // ============================================================
     async function loadCustomers(force = false) {
       const container = document.getElementById('customersListContainer');
-      // 1. Agar xotirada allaqachon mijozlar bo'lsa, DARHOL (0 ms) chizamiz!
-      if (allCustomers && allCustomers.length > 0) {
+      // 1. Agar xotirada yoki LocalStorage da bo'lsa, DARHOL (0 ms) chizamiz!
+      const cached = (allCustomers && allCustomers.length) ? allCustomers : (getLocalCache('dh_customers') || []);
+      if (cached && cached.length > 0) {
+        allCustomers = cached;
         renderFilteredCustomers();
       } else if (!container.children.length) {
         container.innerHTML = '<div class="spinner-box"><div class="spinner"></div></div>';
@@ -1674,18 +1698,14 @@
       try {
         const custs = await apiRequest(`/api/customers`);
         allCustomers = custs;
+        setLocalCache('dh_customers', custs);
         renderFilteredCustomers();
       } catch (err) {
         if (!allCustomers || allCustomers.length === 0) {
           container.innerHTML = `
             <div class="empty-box">
-              <div class="empty-icon-wrap">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-              </div>
-              <div class="empty-title">Mijozlar topilmadi</div>
-              <div class="empty-sub">${escHtml(err.message)}</div>
+              <div class="empty-title">Aloqa xatosi</div>
+              <div class="empty-sub">Internet aloqasini tekshiring</div>
             </div>`;
         }
       }
@@ -1769,9 +1789,27 @@
     // ============================================================
     async function openCustomerDetail(id) {
       activeCustomerId = id;
-      showScreen('detail');
+      showScreen('detail', false);
       const container = document.getElementById('customerDetailContent');
-      container.innerHTML = '<div class="spinner-box"><div class="spinner"></div></div>';
+
+      const existing = (allCustomers || []).find(c => c.id === id);
+      if (existing) {
+        const initials = (existing.full_name || 'M').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+        container.innerHTML = `
+          <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;text-align:center;box-shadow:var(--shadow-sm);margin-bottom:18px">
+            <div class="avatar" style="width:52px;height:52px;font-size:20px;margin:0 auto 10px">${initials}</div>
+            <div style="font-size:20px;font-weight:800;color:var(--text-main)">${escHtml(existing.full_name)}</div>
+            <div style="font-size:13px;color:var(--text-muted);margin-top:2px">${escHtml(existing.phone || '')}</div>
+            <div style="margin-top:14px;padding:12px;background:var(--bg-app);border-radius:var(--radius-md)">
+              <div style="font-size:11px;font-weight:700;color:var(--text-light);text-transform:uppercase">Umumiy Qarz</div>
+              <div style="font-size:24px;font-weight:800;color:${(existing.total_debt || 0) > 0 ? 'var(--danger)' : 'var(--primary)'};margin-top:2px">${formatMoney(existing.total_debt)}</div>
+            </div>
+          </div>
+          <div class="spinner-box"><div class="spinner"></div></div>
+        `;
+      } else {
+        container.innerHTML = '<div class="spinner-box"><div class="spinner"></div></div>';
+      }
 
       try {
         const data = await apiRequest(`/api/customer/${id}`);
@@ -2706,6 +2744,30 @@
       const urlParams = new URLSearchParams(window.location.search);
       const paramRole = urlParams.get('role');
       const paramCustId = urlParams.get('customer_id');
+      const nav = document.getElementById('bottomNav');
+
+      // 1. Agar role=customer bo'lsa darhol bottomNav yashirilsin
+      if (paramRole === 'customer') {
+        if (nav) nav.style.display = 'none';
+      }
+
+      // 2. Mahalliy tezkor kesh (0.01 soniyada ochiladi)
+      const cachedMe = getLocalCache('dh_user_me');
+      const cachedCustData = getLocalCache('dh_customer_data');
+      const cachedStatsData = getLocalCache('dh_stats');
+
+      if (paramRole === 'customer' || (cachedMe && cachedMe.role === 'customer' && !urlParams.has('shop_id'))) {
+        if (nav) nav.style.display = 'none';
+        if (cachedCustData && cachedCustData.customer) {
+          renderCustomerPortal(cachedCustData);
+        }
+      } else if (cachedMe && cachedMe.role === 'admin' && !paramRole) {
+        if (nav) nav.style.display = 'flex';
+        if (cachedStatsData) {
+          showScreen('dashboard', false);
+          renderDashboardCards(cachedStatsData, getLocalCache('dh_customers') || []);
+        }
+      }
 
       try {
         let endpoint = '/api/me';
@@ -2716,25 +2778,36 @@
         if (q.length) endpoint += '?' + q.join('&');
 
         const me = await apiRequest(endpoint);
+        setLocalCache('dh_user_me', me);
+
         if (me.role === 'customer') {
           // FAQAT MIJOZ KO'RINISHI:
-          const nav = document.getElementById('bottomNav');
           if (nav) nav.style.display = 'none';
+          if (me.customer) setLocalCache('dh_customer_data', me);
           renderCustomerPortal(me);
         } else {
           // ADMIN KO'RINISHI:
-          const nav = document.getElementById('bottomNav');
           if (nav) nav.style.display = 'flex';
           if (me.shop_id) shopData.shopId = me.shop_id;
           if (me.admin?.shop_name) {
             const el = document.getElementById('shopNameDisplay');
             if (el) el.textContent = me.admin.shop_name;
           }
+          showScreen('dashboard', false);
           loadDashboard();
         }
       } catch (err) {
-        // Fallback
-        loadDashboard();
+        // Fallback: Agar mijoz roli bo'lsa yoki admin bo'lmasa — ASLO adminga o'tmaymiz!
+        if (paramRole === 'customer' || (cachedMe && cachedMe.role === 'customer')) {
+          if (nav) nav.style.display = 'none';
+          if (!cachedCustData) {
+            renderCustomerPortal({ role: 'customer', customer: null, debts: [] });
+          }
+        } else if (!cachedMe || cachedMe.role === 'admin') {
+          if (nav) nav.style.display = 'flex';
+          showScreen('dashboard', false);
+          loadDashboard();
+        }
       }
     }
 

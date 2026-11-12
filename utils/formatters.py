@@ -70,14 +70,17 @@ def build_customer_detail_text(customer: dict, debts: List[dict]) -> str:
 
 def build_customer_debts_view(customer: dict, debts: List[dict]) -> str:
     """Mijozning o'zi ko'radigan qarzlar hisoboti"""
-    if not debts:
+    active_debts = [d for d in debts if d.get("status") in ("active", "overdue")]
+    total = sum(d["amount"] for d in active_debts)
+
+    if not active_debts or total <= 0:
         return (
             f"🎉 Salom, <b>{esc(customer['full_name'])}</b>!\n\n"
             f"🏪 Do'kon: <b>{esc(customer.get('shop_name', 'Do\'kon'))}</b>\n\n"
-            f"✅ <b>Tabriklaymiz, sizda hech qanday to'lanmagan qarz yo'q!</b>"
+            f"✅ <b>Tabriklaymiz, sizda hech qanday to'lanmagan qarz yo'q!</b>\n"
+            f"Barcha to'lovlar to'liq amalga oshirilgan.\n\n"
+            f"Hisob-kitoblar tarixini ko'rish uchun pastdagi <b>Shaxsiy hisob (Mini App)</b> tugmasini bosing:"
         )
-        
-    total = sum(d["amount"] for d in debts if d.get("status") in ("active", "overdue"))
     
     text = (
         f"👤 Salom, <b>{esc(customer['full_name'])}</b>! 👋\n"

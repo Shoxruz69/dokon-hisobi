@@ -26,9 +26,9 @@ async def get_pg_pool() -> asyncpg.Pool:
             db_url = "postgresql://" + db_url[len("postgres://"):]
         _pg_pool = await asyncpg.create_pool(
             db_url,
-            min_size=3,
-            max_size=20,
-            command_timeout=30,
+            min_size=5,
+            max_size=15,
+            command_timeout=20,
             statement_cache_size=0
         )
     return _pg_pool

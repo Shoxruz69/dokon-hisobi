@@ -393,6 +393,10 @@ async def handle_get_me(request: web.Request):
         if not admin and settings.is_admin_id(uid):
             try:
                 admin = await get_first_active_admin()
+                if admin:
+                    admin = dict(admin)
+                    admin["telegram_id"] = uid
+                    admin["full_name"] = resolve_admin_label(uid)
             except Exception:
                 pass
                 
@@ -413,6 +417,13 @@ async def handle_get_me(request: web.Request):
                 "debts": debts
             })
 
+        # Agar telegram user_id admin bo'lmasa va mijoz ham topilmasa — HECH QACHON adminga chiqarmaymiz!
+        return web.json_response({
+            "role": "customer",
+            "customer": None,
+            "debts": []
+        })
+
     # 3. Fallback: agar role=customer bo'lsa
     if role_param == "customer":
         return web.json_response({
@@ -424,6 +435,8 @@ async def handle_get_me(request: web.Request):
     # 4. Standart holatda Admin do'koni
     shop_id = await resolve_shop_id(request)
     admin = await get_admin_by_shop_id(shop_id)
+    if admin:
+        admin["full_name"] = resolve_admin_label(admin.get("telegram_id"), admin.get("full_name"))
     return web.json_response({
         "role": "admin",
         "admin": admin,

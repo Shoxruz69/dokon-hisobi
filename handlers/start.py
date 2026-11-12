@@ -140,6 +140,11 @@ async def cmd_start(message: Message, state: FSMContext, admin: dict = None):
                     parse_mode="HTML",
                     reply_markup=get_customer_webapp_kb(cust["id"])
                 )
+            
+            await message.answer(
+                "👇 Shaxsiy hisob menyusi:",
+                reply_markup=get_customer_main_kb(cust["id"])
+            )
         return
 
     # 3. YANGI MIJOZ — TELEFON RAQAMINI SO'RAYMIZ
@@ -373,6 +378,10 @@ async def process_customer_phone(message: Message, state: FSMContext):
                 parse_mode="HTML",
                 reply_markup=get_customer_webapp_kb(cust["id"])
             )
+        await message.answer(
+            "👇 Shaxsiy hisob menyusi:",
+            reply_markup=get_customer_main_kb(cust["id"])
+        )
 
 # Agar admin reply menyudagi "Do'kon Paneli" tugmasini bossa
 @router.message(F.text.contains("Do'kon Paneli"))
