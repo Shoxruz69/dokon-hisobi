@@ -32,7 +32,8 @@ async def setup_bot_commands(bot: Bot):
     """Telegram menyusidagi komandalar va Menu tugmasini sozlash"""
     commands = [
         BotCommand(command="start", description="Tizimni ishga tushirish"),
-        BotCommand(command="help", description="Yordam va ma'lumot")
+        BotCommand(command="help", description="Yordam va ma'lumot"),
+        BotCommand(command="eslatma", description="Qarzdorlarga eslatma yuborish (Admin)")
     ]
     try:
         await bot.set_my_commands(commands, scope=BotCommandScopeDefault())
@@ -81,7 +82,7 @@ async def main():
     # 6. Eslatmalar schedulerini ishga tushirish
     scheduler = setup_scheduler(bot)
     scheduler.start()
-    logger.info("⏰ Kunlik eslatmalar scheduleri faollashtirildi (09:00)")
+    logger.info("⏰ Kunlik eslatmalar scheduleri faollashtirildi (19:00)")
 
     # 7. Mini App va REST API uchun aiohttp veb serverini ishga tushirish
     web_app = create_web_app()

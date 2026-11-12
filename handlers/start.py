@@ -389,3 +389,27 @@ async def admin_open_panel(message: Message, admin: dict = None):
         )
     else:
         await message.answer("Sizda do'kon boshqaruviga ruxsat yo'q.")
+
+# Admin uchun /eslatma komandasi - 19:00 xabarlarini qo'lda tekshirish yoki yuborish
+@router.message(Command("eslatma"))
+async def cmd_trigger_reminders(message: Message):
+    user_id = message.from_user.id
+    admin = await get_admin_by_telegram_id(user_id)
+    is_env_admin = settings.is_admin_id(user_id)
+    
+    if not is_env_admin and not admin:
+        await message.answer("Sizda bunday amalni bajarish huquqi yo'q.")
+        return
+        
+    from utils.scheduler import send_reminders
+    wait_msg = await message.answer("⏳ <b>Qarzdor mijozlarga 19:00 eslatmalari yuborilmoqda...</b>", parse_mode="HTML")
+    res = await send_reminders(message.bot)
+    
+    await wait_msg.edit_text(
+        f"✅ <b>Eslatmalar yuborildi!</b>\n\n"
+        f"👥 Qarzi bor mijozlar soni: <b>{res.get('total', 0)} ta</b>\n"
+        f"📨 Yuborilgan xabarlar: <b>{res.get('sent', 0)} ta</b>\n"
+        f"⚠️ Yuborilmadi: <b>{res.get('failed', 0)} ta</b>\n\n"
+        f"ℹ️ <i>Eslatmalar har kuni soat 19:00 da avtomatik ravishda barcha qarzdorlarga bot orqali yuboriladi.</i>",
+        parse_mode="HTML"
+    )

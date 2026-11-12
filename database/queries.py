@@ -398,6 +398,65 @@ async def log_notification(debt_id: int, customer_id: int, ntype: str,
         VALUES (?, ?, ?, ?, ?)
     """, debt_id, customer_id, ntype, success, error_msg)
 
+async def get_all_customers_with_active_debts() -> List[dict]:
+    """Qarzi bor barcha mijozlar va ularning faol/kechikkan qarzlari ro'yxati (19:00 xabarlari uchun)"""
+    rows = await db_fetch_all("""
+        SELECT 
+            c.id as customer_id,
+            c.full_name,
+            c.phone,
+            c.telegram_id,
+            c.total_debt,
+            c.shop_id,
+            a.shop_name,
+            a.phone as admin_phone,
+            d.id as debt_id,
+            d.amount as debt_amount,
+            d.description as debt_description,
+            d.due_date,
+            d.status as debt_status,
+            d.debt_date
+        FROM customers c
+        JOIN debts d ON d.customer_id = c.id AND d.status IN ('active', 'overdue')
+        JOIN admins a ON a.shop_id = c.shop_id
+        WHERE c.telegram_id IS NOT NULL
+        ORDER BY c.id, d.due_date ASC
+    """)
+    
+    customers_map: Dict[int, dict] = {}
+    for r in rows:
+        cid = r["customer_id"]
+        if cid not in customers_map:
+            customers_map[cid] = {
+                "customer_id": cid,
+                "full_name": r["full_name"],
+                "phone": r["phone"],
+                "telegram_id": r["telegram_id"],
+                "total_debt": float(r["total_debt"] or 0),
+                "shop_id": r["shop_id"],
+                "shop_name": r["shop_name"] or "Do'kon",
+                "admin_phone": r["admin_phone"],
+                "debts": []
+            }
+        customers_map[cid]["debts"].append({
+            "debt_id": r["debt_id"],
+            "amount": float(r["debt_amount"] or 0),
+            "description": r["debt_description"],
+            "due_date": r["due_date"],
+            "status": r["debt_status"],
+            "debt_date": r["debt_date"]
+        })
+        
+    # Haqiqiy qarz summasini hisoblash va faqat qarzi borlarni qoldirish
+    result = []
+    for cust in customers_map.values():
+        calc_sum = sum(d["amount"] for d in cust["debts"])
+        cust["total_debt"] = max(cust["total_debt"], calc_sum)
+        if cust["total_debt"] > 0 and cust["debts"]:
+            result.append(cust)
+            
+    return result
+
 # ============================================================
 # 5. STATISTIKA VA O'CHIRISH
 # ============================================================
