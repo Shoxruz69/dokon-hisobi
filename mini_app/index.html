@@ -656,9 +656,12 @@
       font-family: inherit;
     }
 
-    .chip-btn:active {
+    .chip-btn:active,
+    .chip-btn.active {
       background: var(--primary);
+      border-color: var(--primary);
       color: white;
+      box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
     }
 
     /* ============================================================
@@ -1346,6 +1349,13 @@
           </span>
           <input type="tel" class="custom-input" id="inp-phone" placeholder="+998 90 123 45 67">
         </div>
+        <div class="chips-group" id="chips-country-add" style="margin-top:7px">
+          <button type="button" class="chip-btn active" data-country="uz" onclick="setPhoneCountry('inp-phone', 'uz', this)">🇺🇿 +998</button>
+          <button type="button" class="chip-btn" data-country="ru" onclick="setPhoneCountry('inp-phone', 'ru', this)">🇷🇺 +7</button>
+          <button type="button" class="chip-btn" data-country="kz" onclick="setPhoneCountry('inp-phone', 'kz', this)">🇰🇿 +7</button>
+          <button type="button" class="chip-btn" data-country="kg" onclick="setPhoneCountry('inp-phone', 'kg', this)">🇰🇬 +996</button>
+          <button type="button" class="chip-btn" data-country="other" onclick="setPhoneCountry('inp-phone', 'other', this)">🌐 Boshqa</button>
+        </div>
         <div class="error-msg" id="err-phone"></div>
       </div>
 
@@ -1728,7 +1738,7 @@
       const q = (searchQuery || document.getElementById('customerSearchInput')?.value || '').toLowerCase().trim();
 
       let list = allCustomers.filter(c => {
-        const matchesQuery = !q || c.full_name.toLowerCase().includes(q) || c.phone.includes(q);
+        const matchesQuery = !q || c.full_name.toLowerCase().includes(q) || ((c.phone || '').includes(q));
         if (!matchesQuery) return false;
 
         if (currentFilter === 'overdue') return (c.overdue_debts || 0) > 0;
@@ -1771,7 +1781,7 @@
           <div class="customer-info">
             <div class="customer-name">${escHtml(c.full_name)}</div>
             <div class="customer-meta">
-              <span>${escHtml(c.phone)}</span> • ${badge}
+              <span>${escHtml(c.phone || 'Raqam yo\'q')}</span> • ${badge}
             </div>
           </div>
           <div class="customer-right">
@@ -1897,7 +1907,7 @@
           <div style="text-align:center;padding:16px 0 20px">
             <div class="avatar" style="width:68px;height:68px;font-size:24px;margin:0 auto 10px">${initials}</div>
             <h3 style="font-size:20px;font-weight:800">${escHtml(data.full_name)}</h3>
-            <p style="color:var(--text-muted);font-size:14px;margin-top:2px">${escHtml(data.phone)}</p>
+            <p style="color:var(--text-muted);font-size:14px;margin-top:2px">${escHtml(data.phone || 'Raqam kiritilmagan')}</p>
             ${data.notes ? `<p style="font-size:12px;color:var(--text-light);margin-top:4px;font-style:italic">"${escHtml(data.notes)}"</p>` : ''}
             
             <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;margin-top:16px">
@@ -2159,7 +2169,9 @@
       const cust = (allCustomers || []).find(c => c.id === customerId);
       if (cust) {
         document.getElementById('inp-edit-name').value = cust.full_name || '';
-        document.getElementById('inp-edit-phone').value = cust.phone || '';
+        const pVal = cust.phone || '';
+        document.getElementById('inp-edit-phone').value = pVal;
+        syncPhoneCountryFromValue('inp-edit-phone', pVal);
         document.getElementById('inp-edit-notes').value = cust.notes || '';
       }
 
@@ -2176,7 +2188,9 @@
         const fullCust = await apiRequest(`/api/customer/${customerId}`);
         if (fullCust) {
           document.getElementById('inp-edit-name').value = fullCust.full_name || '';
-          document.getElementById('inp-edit-phone').value = fullCust.phone || '';
+          const pVal = fullCust.phone || '';
+          document.getElementById('inp-edit-phone').value = pVal;
+          syncPhoneCountryFromValue('inp-edit-phone', pVal);
           document.getElementById('inp-edit-notes').value = fullCust.notes || '';
         }
       } catch (e) {}
@@ -2201,8 +2215,8 @@
       } else clearFieldError('edit-name');
 
       const phoneDigits = phoneRaw.replace(/\D/g, '');
-      if (phoneDigits.length > 0 && phoneDigits.length < 9) {
-        showFieldError('edit-phone', 'Telefon raqam to\'liq bo\'lsin yoki bo\'sh qoldiring');
+      if (phoneDigits.length > 0 && phoneDigits.length < 7) {
+        showFieldError('edit-phone', 'Telefon raqam kamida 7 ta raqam bo\'lsin yoki bo\'sh qoldiring');
         valid = false;
       } else clearFieldError('edit-phone');
 
@@ -2218,7 +2232,7 @@
       try {
         const payload = {
           full_name: name,
-          phone: phoneDigits.length >= 9 ? phoneRaw.replace(/\s+/g, '') : null,
+          phone: phoneDigits.length >= 7 ? (phoneRaw.startsWith('+') ? phoneRaw.replace(/\s+/g, '') : '+' + phoneDigits) : null,
           notes: notes || null
         };
         const res = await apiRequest(`/api/customer/${customerId}/edit`, 'POST', payload);
@@ -2280,6 +2294,7 @@
         const err = document.getElementById('err-' + id);
         if (err) { err.textContent = ''; err.classList.remove('show'); }
       });
+      setPhoneCountry('inp-phone', 'uz');
       setQuickDays(7);
     }
 
@@ -2308,27 +2323,177 @@
       });
     }
 
+    function detectCountryFromPhone(str) {
+      if (!str) return 'uz';
+      const clean = str.replace(/[\s\-\(\)]/g, '');
+      if (clean.startsWith('+998') || clean.startsWith('998')) return 'uz';
+      if (clean.startsWith('+7') || (clean.startsWith('7') && clean.length >= 10)) return 'ru';
+      if (clean.startsWith('+996') || clean.startsWith('996')) return 'kg';
+      if (clean.startsWith('+')) return 'other';
+      return 'uz';
+    }
+
+    function formatPhoneValue(rawVal, country) {
+      if (!rawVal) return '';
+      const str = String(rawVal).trim();
+      if (!str) return '';
+
+      const allDigits = str.replace(/\D/g, '');
+      if (!allDigits) return str.startsWith('+') ? '+' : '';
+
+      if (country === 'uz') {
+        let sub = allDigits;
+        if (sub.startsWith('998')) {
+          sub = sub.substring(3);
+        }
+        sub = sub.substring(0, 9);
+        if (!sub) return '';
+        let res = '+998';
+        if (sub.length > 0) res += ' ' + sub.substring(0, 2);
+        if (sub.length > 2) res += ' ' + sub.substring(2, 5);
+        if (sub.length > 5) res += ' ' + sub.substring(5, 7);
+        if (sub.length > 7) res += ' ' + sub.substring(7, 9);
+        return res;
+      }
+
+      if (country === 'ru' || country === 'kz') {
+        let sub = allDigits;
+        if (sub.startsWith('7')) {
+          sub = sub.substring(1);
+        } else if (sub.startsWith('8') && sub.length === 11) {
+          sub = sub.substring(1);
+        }
+        sub = sub.substring(0, 10);
+        if (!sub) return '';
+        let res = '+7';
+        if (sub.length > 0) res += ' ' + sub.substring(0, 3);
+        if (sub.length > 3) res += ' ' + sub.substring(3, 6);
+        if (sub.length > 6) res += ' ' + sub.substring(6, 8);
+        if (sub.length > 8) res += ' ' + sub.substring(8, 10);
+        return res;
+      }
+
+      if (country === 'kg') {
+        let sub = allDigits;
+        if (sub.startsWith('996')) {
+          sub = sub.substring(3);
+        } else if (sub.startsWith('0') && sub.length === 10) {
+          sub = sub.substring(1);
+        }
+        sub = sub.substring(0, 9);
+        if (!sub) return '';
+        let res = '+996';
+        if (sub.length > 0) res += ' ' + sub.substring(0, 3);
+        if (sub.length > 3) res += ' ' + sub.substring(3, 6);
+        if (sub.length > 6) res += ' ' + sub.substring(6, 9);
+        return res;
+      }
+
+      // 'other' yoki lyuboy xalqaro raqam
+      let sub = allDigits.substring(0, 15);
+      if (!sub) return '';
+      let res = '+';
+      if (sub.length <= 4) {
+        res += sub;
+      } else if (sub.length <= 7) {
+        res += sub.substring(0, 3) + ' ' + sub.substring(3);
+      } else if (sub.length <= 10) {
+        res += sub.substring(0, 3) + ' ' + sub.substring(3, 6) + ' ' + sub.substring(6);
+      } else {
+        res += sub.substring(0, 3) + ' ' + sub.substring(3, 6) + ' ' + sub.substring(6, 10) + ' ' + sub.substring(10);
+      }
+      return res;
+    }
+
+    function updateActiveChip(inputId, countryCode) {
+      const containerId = inputId === 'inp-phone' ? 'chips-country-add' : 'chips-country-edit';
+      const container = document.getElementById(containerId);
+      if (container) {
+        container.querySelectorAll('.chip-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.country === countryCode);
+        });
+      }
+    }
+
+    function setPhoneCountry(inputId, countryCode, btnEl) {
+      const el = document.getElementById(inputId);
+      if (!el) return;
+      el.dataset.country = countryCode;
+
+      const container = btnEl ? btnEl.parentElement : (inputId === 'inp-phone' ? document.getElementById('chips-country-add') : document.getElementById('chips-country-edit'));
+      if (container) {
+        container.querySelectorAll('.chip-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.country === countryCode);
+        });
+      }
+
+      if (countryCode === 'uz') {
+        el.placeholder = '+998 90 123 45 67';
+        if (el.value) el.value = formatPhoneValue(el.value, 'uz');
+      } else if (countryCode === 'ru') {
+        el.placeholder = '+7 916 123 45 67';
+        if (el.value) el.value = formatPhoneValue(el.value, 'ru');
+        else el.value = '+7 ';
+      } else if (countryCode === 'kz') {
+        el.placeholder = '+7 701 123 45 67';
+        if (el.value) el.value = formatPhoneValue(el.value, 'kz');
+        else el.value = '+7 ';
+      } else if (countryCode === 'kg') {
+        el.placeholder = '+996 555 123 456';
+        if (el.value) el.value = formatPhoneValue(el.value, 'kg');
+        else el.value = '+996 ';
+      } else if (countryCode === 'other') {
+        el.placeholder = '+1 234 567 89 00';
+        if (!el.value) el.value = '+';
+      }
+      el.focus();
+      haptic('impact', 'light');
+    }
+
+    function syncPhoneCountryFromValue(inputId, phoneVal) {
+      const el = document.getElementById(inputId);
+      if (!el) return;
+      const country = detectCountryFromPhone(phoneVal);
+      el.dataset.country = country;
+      updateActiveChip(inputId, country);
+      if (phoneVal) {
+        el.value = formatPhoneValue(phoneVal, country);
+      }
+    }
+
     function setupPhoneFormatter(elId) {
       const el = document.getElementById(elId);
       if (!el) return;
-      el.addEventListener('input', function() {
-        let val = this.value.replace(/\D/g, '');
-        if (val.startsWith('998')) {
-          val = val.substring(3);
-        } else if (val.startsWith('8')) {
-          val = val.substring(1);
-        }
-        val = val.substring(0, 9);
-        if (!val) {
+      if (!el.dataset.country) el.dataset.country = 'uz';
+
+      el.addEventListener('input', function(e) {
+        const val = this.value;
+        if (!val.trim()) {
           this.value = '';
           return;
         }
-        let res = '+998';
-        if (val.length > 0) res += ' ' + val.substring(0, 2);
-        if (val.length > 2) res += ' ' + val.substring(2, 5);
-        if (val.length > 5) res += ' ' + val.substring(5, 7);
-        if (val.length > 7) res += ' ' + val.substring(7, 9);
-        this.value = res;
+
+        let country = this.dataset.country || 'uz';
+        const rawClean = val.replace(/[\s\-\(\)]/g, '');
+        if (rawClean.startsWith('+7') && country !== 'ru' && country !== 'kz') {
+          country = 'ru';
+          this.dataset.country = 'ru';
+          updateActiveChip(elId, 'ru');
+        } else if (rawClean.startsWith('+996') && country !== 'kg') {
+          country = 'kg';
+          this.dataset.country = 'kg';
+          updateActiveChip(elId, 'kg');
+        } else if (rawClean.startsWith('+998') && country !== 'uz') {
+          country = 'uz';
+          this.dataset.country = 'uz';
+          updateActiveChip(elId, 'uz');
+        } else if (rawClean.startsWith('+') && !rawClean.startsWith('+998') && !rawClean.startsWith('+7') && !rawClean.startsWith('+996')) {
+          country = 'other';
+          this.dataset.country = 'other';
+          updateActiveChip(elId, 'other');
+        }
+
+        this.value = formatPhoneValue(val, country);
       });
     }
 
@@ -2362,8 +2527,8 @@
 
       // Telefon raqam ixtiyoriy (agar kiritilsa to'liq bo'lsin)
       const phoneDigits = phoneRaw.replace(/\D/g, '');
-      if (phoneDigits.length > 0 && phoneDigits.length < 9) {
-        showFieldError('phone', 'Telefon raqam to\'liq bo\'lsin yoki bo\'sh qoldiring');
+      if (phoneDigits.length > 0 && phoneDigits.length < 7) {
+        showFieldError('phone', 'Telefon raqam kamida 7 ta raqam bo\'lsin yoki bo\'sh qoldiring');
         valid = false;
       } else clearFieldError('phone');
 
@@ -2393,7 +2558,7 @@
         const payload = {
           shop_id: shopData.shopId,
           full_name: name,
-          phone: phoneDigits.length >= 9 ? phoneRaw.replace(/\s+/g, '') : null,
+          phone: phoneDigits.length >= 7 ? (phoneRaw.startsWith('+') ? phoneRaw.replace(/\s+/g, '') : '+' + phoneDigits) : null,
           amount: amount,
           description: desc,
           due_date: date,
@@ -3145,6 +3310,13 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
             </span>
             <input type="tel" class="custom-input" id="inp-edit-phone" placeholder="+998 90 123 45 67">
+          </div>
+          <div class="chips-group" id="chips-country-edit" style="margin-top:7px">
+            <button type="button" class="chip-btn active" data-country="uz" onclick="setPhoneCountry('inp-edit-phone', 'uz', this)">🇺🇿 +998</button>
+            <button type="button" class="chip-btn" data-country="ru" onclick="setPhoneCountry('inp-edit-phone', 'ru', this)">🇷🇺 +7</button>
+            <button type="button" class="chip-btn" data-country="kz" onclick="setPhoneCountry('inp-edit-phone', 'kz', this)">🇰🇿 +7</button>
+            <button type="button" class="chip-btn" data-country="kg" onclick="setPhoneCountry('inp-edit-phone', 'kg', this)">🇰🇬 +996</button>
+            <button type="button" class="chip-btn" data-country="other" onclick="setPhoneCountry('inp-edit-phone', 'other', this)">🌐 Boshqa</button>
           </div>
           <div class="field-error" id="err-edit-phone"></div>
         </div>

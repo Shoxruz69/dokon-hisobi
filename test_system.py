@@ -27,6 +27,18 @@ async def run_tests():
     # Telefon
     ok, phone = validate_phone("+998 90 123 45 67")
     assert ok and phone == "+998901234567", f"Phone val xato: {phone}"
+    ok, phone88 = validate_phone("+998 88 732 55 15")
+    assert ok and phone88 == "+998887325515", f"Phone 88 xato: {phone88}"
+    ok, phone88_loc = validate_phone("887325515")
+    assert ok and phone88_loc == "+998887325515", f"Phone 88 local xato: {phone88_loc}"
+    ok, phone_ru = validate_phone("+7 916 123 45 67")
+    assert ok and phone_ru == "+79161234567", f"Phone RU xato: {phone_ru}"
+    ok, phone_kz = validate_phone("+7 701 123 45 67")
+    assert ok and phone_kz == "+77011234567", f"Phone KZ xato: {phone_kz}"
+    ok, phone_kg = validate_phone("+996 555 123 456")
+    assert ok and phone_kg == "+996555123456", f"Phone KG xato: {phone_kg}"
+    ok, phone_any = validate_phone("+1 202 555 0123")
+    assert ok and phone_any == "+12025550123", f"Phone Any xato: {phone_any}"
     ok, err = validate_phone("12345")
     assert not ok, "Noto'g'ri telefon qabul qilindi!"
 
@@ -52,17 +64,19 @@ async def run_tests():
 
     # 3. Admin yaratish
     print("\n3. Admin yaratish...")
+    import random
+    test_tid = random.randint(100_000_000, 999_999_999)
     admin_res = await create_admin(
-        telegram_id=999888777,
+        telegram_id=test_tid,
         full_name="Sinov Admin",
         shop_name="Sinov Do'koni",
-        username="sinov_admin",
+        username=f"sinov_{test_tid}",
         phone="+998901112233"
     )
     shop_id = admin_res["shop_id"]
     print(f"✅ Admin yaratildi: {admin_res['shop_name']}, Shop ID: {shop_id}")
 
-    admin = await get_admin_by_telegram_id(999888777)
+    admin = await get_admin_by_telegram_id(test_tid)
     assert admin is not None and admin["shop_id"] == shop_id
 
     # 4. Mijoz va qarz qo'shish
