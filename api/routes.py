@@ -21,7 +21,8 @@ from database.queries import (
     record_customer_payment,
     add_debt_to_existing_customer,
     update_customer,
-    delete_customer
+    delete_customer,
+    resolve_admin_label
 )
 from utils.validators import validate_phone, validate_amount, validate_date, validate_full_name
 from utils.notifications import (
