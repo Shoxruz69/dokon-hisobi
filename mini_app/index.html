@@ -1585,9 +1585,19 @@
     document.documentElement.classList.remove('dark');
     document.body.classList.remove('dark');
 
+    function getLocalDateString(d = new Date()) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
     let currentScreen = 'dashboard';
     let currentFilter = 'all';
     let allCustomers = [];
+    let cachedStats = null;
+    let statsPeriod = 'today';
+    let statsSelectedDate = getLocalDateString();
     let activeCustomerId = null;
     let shopData = {
       shopId: '',
@@ -1725,9 +1735,7 @@
       document.getElementById('stat-customers').textContent = `${stats.total_customers || 0} ta`;
       document.getElementById('stat-week').textContent = `${stats.due_this_week || 0} ta`;
 
-      if (custs && custs.length) {
-        renderRecentCustomers(custs.slice(0, 5));
-      }
+      renderRecentCustomers((custs || []).slice(0, 5));
     }
 
     async function loadDashboard(force = false) {
@@ -1818,18 +1826,6 @@
         }
       } finally {
         hideTopLoader();
-      }
-    }
-        setLocalCache('dh_customers', custs);
-        renderFilteredCustomers();
-      } catch (err) {
-        if (!allCustomers || allCustomers.length === 0) {
-          container.innerHTML = `
-            <div class="empty-box">
-              <div class="empty-title">Aloqa xatosi</div>
-              <div class="empty-sub">Internet aloqasini tekshiring</div>
-            </div>`;
-        }
       }
     }
 
@@ -1937,7 +1933,7 @@
             <!-- IKKITA ASOSIY AMAL TUGMASI: TO'LOV QABUL QILISH VA YANA QARZ QO'SHISH -->
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">
               <button class="btn-customer-action btn-action-pay" onclick="openPaymentModal(${existing.id})">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
                   <line x1="12" y1="5" x2="12" y2="19"/>
                   <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
@@ -1945,7 +1941,7 @@
               </button>
 
               <button class="btn-customer-action btn-action-add" onclick="openAddDebtModal(${existing.id})">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
                   <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
                 <span>Qarz qo'shish</span>
@@ -2070,7 +2066,7 @@
             <!-- IKKITA ASOSIY AMAL TUGMASI: TO'LOV QABUL QILISH VA YANA QARZ QO'SHISH -->
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">
               <button class="btn-customer-action btn-action-pay" onclick="openPaymentModal(${data.id})">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
                   <line x1="12" y1="5" x2="12" y2="19"/>
                   <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
@@ -2078,7 +2074,7 @@
               </button>
 
               <button class="btn-customer-action btn-action-add" onclick="openAddDebtModal(${data.id})">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
                   <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
                 <span>Qarz qo'shish</span>
@@ -2772,16 +2768,6 @@
     // ============================================================
     // STATS (BUGUN, SHU OY VA SANA TANLASH)
     // ============================================================
-    let statsPeriod = 'today'; // 'today' | 'month' | 'custom'
-    let statsSelectedDate = getLocalDateString();
-    let cachedStats = null;
-
-    function getLocalDateString(d = new Date()) {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    }
 
     async function loadStats(targetDate = null) {
       const container = document.getElementById('statsDetailContent');
@@ -3117,11 +3103,11 @@
         return;
       }
 
-      const shopNameEl = document.getElementById('shopNameDisplay');
+      const shopNameEl = document.getElementById('headerShopTitle') || document.getElementById('shopNameDisplay');
       if (shopNameEl) shopNameEl.textContent = cust.shop_name || "Do'kon";
       
-      const badgeEl = document.getElementById('shopStatusBadge');
-      if (badgeEl) badgeEl.innerHTML = '<span class="status-dot"></span> Mijoz hisobi';
+      const badgeEl = document.getElementById('shopIdText') || document.getElementById('shopStatusBadge');
+      if (badgeEl) badgeEl.textContent = 'Mijoz hisobi';
 
       const activeDebts = debts.filter(d => d.status !== 'paid');
       const paidDebts = debts.filter(d => d.status === 'paid');
@@ -3294,22 +3280,29 @@
           if (me.stats) {
             cachedStats = me.stats;
             setLocalCache('dh_stats', me.stats);
+          } else {
+            loadDashboard();
           }
           if (me.customers) {
             allCustomers = me.customers;
             setLocalCache('dh_customers', me.customers);
+          } else {
+            loadCustomers();
           }
           renderDashboardCards(cachedStats, allCustomers);
           if (currentScreen === 'customers') renderFilteredCustomers();
           if (currentScreen === 'stats') renderStatsView(cachedStats);
         }
       } catch (err) {
+        console.error('checkAuthAndBoot xatosi:', err);
         // Fallback: Agar mijoz roli bo'lsa yoki admin bo'lmasa — ASLO adminga o'tmaymiz!
         if (paramRole === 'customer' || (cachedMe && cachedMe.role === 'customer')) {
           if (nav) nav.style.display = 'none';
           if (!cachedCustData) {
             renderCustomerPortal({ role: 'customer', customer: null, debts: [] });
           }
+        } else {
+          loadDashboard();
         }
       } finally {
         hideTopLoader();
