@@ -1600,12 +1600,12 @@
     let statsSelectedDate = getLocalDateString();
     let activeCustomerId = null;
     let shopData = {
-      shopId: '',
+      shopId: '5832B1F2',
       shopName: "Do'kon Hisobi"
     };
 
     const urlParams = new URLSearchParams(window.location.search);
-    shopData.shopId = urlParams.get('shop_id') || tg?.initDataUnsafe?.start_param || '';
+    shopData.shopId = urlParams.get('shop_id') || tg?.initDataUnsafe?.start_param || getLocalCache('dh_shop_id') || '5832B1F2';
 
     // ============================================================
     // TEZKOR MAHALLIY KESH (0.01s da yuklanish uchun)
@@ -1747,10 +1747,9 @@
         allCustomers = cachedCusts;
         renderDashboardCards(cached, cachedCusts);
       }
-      if (!force && cachedStats && allCustomers && allCustomers.length) {
-        return;
+      if (!cachedStats) {
+        showTopLoader();
       }
-      showTopLoader();
       try {
         const [stats, custs] = await Promise.all([
           apiRequest(`/api/stats`),
@@ -1797,7 +1796,7 @@
     }
 
     // ============================================================
-    // CUSTOMERS LIST (BIR LAHZADA CHIQARISH)
+    // CUSTOMERS LIST (BIR LAHZADA CHIQARISH VA FONDA YANGILASH)
     // ============================================================
     async function loadCustomers(force = false) {
       const container = document.getElementById('customersListContainer');
@@ -1807,10 +1806,9 @@
         allCustomers = cached;
         renderFilteredCustomers();
       }
-      if (!force && allCustomers && allCustomers.length > 0) {
-        return;
+      if (!allCustomers || allCustomers.length === 0) {
+        showTopLoader();
       }
-      showTopLoader();
       try {
         const custs = await apiRequest(`/api/customers`);
         allCustomers = custs;
@@ -2120,8 +2118,14 @@
         });
         showToast("Qarz to'landi deb belgilandi!", "success");
         cachedStats = null;
+        try {
+          localStorage.removeItem('dh_stats');
+          localStorage.removeItem('dh_customers');
+          localStorage.removeItem('dh_user_me');
+        } catch(e) {}
         if (activeCustomerId) openCustomerDetail(activeCustomerId);
-        loadCustomers();
+        loadCustomers(true);
+        loadDashboard(true);
       } catch (err) {
         showToast(err.message, "error");
       }
@@ -2203,8 +2207,14 @@
         document.getElementById('modalPayment').classList.remove('show');
         showToast(`${formatMoney(res.paid_amount)} to'landi! Qolgan qarz: ${formatMoney(res.remaining_debt)}`, 'success');
         cachedStats = null;
+        try {
+          localStorage.removeItem('dh_stats');
+          localStorage.removeItem('dh_customers');
+          localStorage.removeItem('dh_user_me');
+        } catch(e) {}
         openCustomerDetail(activeCustomerId);
-        loadCustomers();
+        loadCustomers(true);
+        loadDashboard(true);
       } catch (err) {
         haptic('notification', 'error');
         showToast(err.message, 'error');
@@ -2305,8 +2315,14 @@
         document.getElementById('modalAddDebt').classList.remove('show');
         showToast(`${formatMoney(amountVal)} qarz qo'shildi! Jami: ${formatMoney(res.total_debt)}`, 'success');
         cachedStats = null;
+        try {
+          localStorage.removeItem('dh_stats');
+          localStorage.removeItem('dh_customers');
+          localStorage.removeItem('dh_user_me');
+        } catch(e) {}
         openCustomerDetail(activeCustomerId);
-        loadCustomers();
+        loadCustomers(true);
+        loadDashboard(true);
       } catch (err) {
         haptic('notification', 'error');
         showToast(err.message, 'error');
@@ -2411,7 +2427,8 @@
         setLocalCache('dh_customers', allCustomers);
 
         openCustomerDetail(customerId);
-        loadCustomers();
+        loadCustomers(true);
+        loadDashboard(true);
       } catch (err) {
         haptic('notification', 'error');
         showToast(err.message, 'error');
@@ -2443,7 +2460,8 @@
         try { localStorage.removeItem('dh_stats'); } catch (e) {}
 
         showScreen('customers');
-        loadCustomers();
+        loadCustomers(true);
+        loadDashboard(true);
       } catch (err) {
         haptic('notification', 'error');
         showToast(err.message, 'error');
@@ -2725,7 +2743,7 @@
 
       try {
         const payload = {
-          shop_id: shopData.shopId,
+          shop_id: shopData.shopId || '5832B1F2',
           full_name: name,
           phone: phoneDigits.length >= 7 ? (phoneRaw.startsWith('+') ? phoneRaw.replace(/\s+/g, '') : '+' + phoneDigits) : null,
           amount: amount,
@@ -2736,10 +2754,23 @@
         const res = await apiRequest('/api/customers/add', 'POST', payload);
         haptic('notification', 'success');
         showToast(res.is_new ? "Yangi mijoz saqlandi" : "Qarz qo'shildi", "success");
+
+        // 1. Keshni tozalash
         cachedStats = null;
         allCustomers = [];
+        try {
+          localStorage.removeItem('dh_stats');
+          localStorage.removeItem('dh_customers');
+          localStorage.removeItem('dh_user_me');
+        } catch(e) {}
+
+        // 2. Formani tozalash
         resetForm();
-        showScreen('customers');
+
+        // 3. Majburiy yangi ma'lumotlarni serverdan tortib olib ko'rsatish
+        showScreen('customers', false);
+        await loadCustomers(true);
+        loadDashboard(true);
       } catch (err) {
         haptic('notification', 'error');
         showToast(err.message, "error");
@@ -3269,7 +3300,10 @@
           // ADMIN KO'RINISHI:
           if (nav) nav.style.display = 'flex';
           document.documentElement.classList.remove('is-customer-role');
-          if (me.shop_id) shopData.shopId = me.shop_id;
+          if (me.shop_id) {
+            shopData.shopId = me.shop_id;
+            setLocalCache('dh_shop_id', me.shop_id);
+          }
           if (me.admin?.shop_name) {
             shopData.shopName = me.admin.shop_name;
             const el = document.getElementById('headerShopTitle');

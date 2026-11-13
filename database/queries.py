@@ -230,7 +230,7 @@ async def get_customers_list(shop_id: str, search: Optional[str] = None,
     elif status_filter == "paid":
         query += " HAVING c.total_debt = 0"
 
-    query += " ORDER BY c.total_debt DESC, c.full_name ASC"
+    query += " ORDER BY c.id DESC"
 
     return await db_fetch_all(query, *params)
 
