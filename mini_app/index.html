@@ -7,6 +7,17 @@
   <meta name="theme-color" content="#10B981">
   <title>Dokon Hisobi — Boshqaruv Paneli</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    (function() {
+      try {
+        var p = new URLSearchParams(window.location.search);
+        var me = JSON.parse(localStorage.getItem('dh_user_me') || 'null');
+        if (p.get('role') === 'customer' || (me && me.role === 'customer' && !p.has('shop_id'))) {
+          document.documentElement.classList.add('is-customer-role');
+        }
+      } catch(e) {}
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -865,17 +876,49 @@
       line-height: 1.4;
     }
 
+    #topLoadingBar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #10B981, #059669);
+      width: 0%;
+      z-index: 9999;
+      pointer-events: none;
+      transition: width 0.3s ease, opacity 0.3s ease;
+      opacity: 0;
+    }
+
+    .skeleton-card {
+      height: 72px;
+      margin-bottom: 10px;
+      border-radius: var(--radius-md);
+      background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border: 1px solid var(--border);
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .is-customer-role #bottomNav {
+      display: none !important;
+    }
+
     .spinner-box {
       display: flex;
       justify-content: center;
       align-items: center;
-      padding: 40px 0;
+      padding: 24px 0;
     }
 
     .spinner {
-      width: 32px;
-      height: 32px;
-      border: 3px solid var(--border);
+      width: 24px;
+      height: 24px;
+      border: 2.5px solid var(--border);
       border-top-color: var(--primary);
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
@@ -1158,6 +1201,7 @@
   </style>
 </head>
 <body>
+  <div id="topLoadingBar"></div>
 
   <!-- HEADER -->
   <header class="app-header">
@@ -1172,7 +1216,7 @@
         <h1 id="headerShopTitle">Dokon Hisobi</h1>
         <div class="shop-badge">
           <span class="shop-badge-dot"></span>
-          <span id="shopIdText">Yuklanmoqda...</span>
+          <span id="shopIdText">Ulangan</span>
         </div>
       </div>
     </div>
@@ -1188,7 +1232,7 @@
   <!-- ============================================================
        SCREEN: DASHBOARD
        ============================================================ -->
-  <main class="screen" id="screen-dashboard">
+  <main class="screen active" id="screen-dashboard">
     <!-- HERO CARD -->
     <div class="hero-card">
       <div class="hero-top">
@@ -1281,7 +1325,8 @@
     </div>
 
     <div id="dashboardRecentList">
-      <div class="spinner-box"><div class="spinner"></div></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
     </div>
   </main>
 
@@ -1317,7 +1362,9 @@
 
     <!-- LIST -->
     <div id="customersListContainer">
-      <div class="spinner-box"><div class="spinner"></div></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
     </div>
   </main>
 
@@ -1471,7 +1518,13 @@
     </div>
 
     <div id="statsDetailContent">
-      <div class="spinner-box"><div class="spinner"></div></div>
+      <div class="stats-tab-bar">
+        <button class="stats-tab-btn active" onclick="switchStatsPeriod('today')">Bugun</button>
+        <button class="stats-tab-btn" onclick="switchStatsPeriod('month')">Shu oy</button>
+        <button class="stats-tab-btn" onclick="switchStatsPeriod('custom')">Sana tanlash</button>
+      </div>
+      <div class="skeleton-card" style="height:100px"></div>
+      <div class="skeleton-card" style="height:100px"></div>
     </div>
   </main>
 
@@ -1480,15 +1533,16 @@
        ============================================================ -->
   <main class="screen" id="screen-customer">
     <div id="customerPortalContent">
-      <div class="spinner-box"><div class="spinner"></div></div>
+      <div class="skeleton-card" style="height:120px"></div>
+      <div class="skeleton-card"></div>
     </div>
   </main>
 
   <!-- ============================================================
        BOTTOM NAVIGATION
        ============================================================ -->
-  <nav class="bottom-nav" id="bottomNav" style="display:none">
-    <button class="nav-item" id="nav-dashboard" onclick="showScreen('dashboard')">
+  <nav class="bottom-nav" id="bottomNav">
+    <button class="nav-item active" id="nav-dashboard" onclick="showScreen('dashboard')">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
         <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
@@ -1558,6 +1612,16 @@
       } catch (e) {}
     }
 
+    // 0 MS DA DARHOL DASTLABKI XOTIRAGA OLISH
+    try {
+      const _initStats = getLocalCache('dh_stats');
+      const _initCusts = getLocalCache('dh_customers') || [];
+      if (_initStats) {
+        cachedStats = _initStats;
+        allCustomers = _initCusts;
+      }
+    } catch (e) {}
+
     function haptic(type = 'impact', style = 'light') {
       try {
         if (tg?.HapticFeedback) {
@@ -1565,6 +1629,23 @@
           if (type === 'notification') tg.HapticFeedback.notificationOccurred(style);
         }
       } catch (e) {}
+    }
+
+    function showTopLoader() {
+      const b = document.getElementById('topLoadingBar');
+      if (!b) return;
+      b.style.opacity = '1';
+      b.style.width = '65%';
+    }
+
+    function hideTopLoader() {
+      const b = document.getElementById('topLoadingBar');
+      if (!b) return;
+      b.style.width = '100%';
+      setTimeout(() => {
+        b.style.opacity = '0';
+        setTimeout(() => { b.style.width = '0%'; }, 250);
+      }, 100);
     }
 
     // ============================================================
@@ -1617,7 +1698,10 @@
 
     function refreshCurrentScreen() {
       haptic('impact', 'medium');
-      showScreen(currentScreen, true);
+      if (currentScreen === 'dashboard') loadDashboard(true);
+      else if (currentScreen === 'customers') loadCustomers(true);
+      else if (currentScreen === 'stats') { cachedStats = null; loadStats(statsSelectedDate); }
+      else if (currentScreen === 'detail' && activeCustomerId) openCustomerDetail(activeCustomerId);
       showToast('Yangilandi', 'success');
     }
 
@@ -1655,6 +1739,10 @@
         allCustomers = cachedCusts;
         renderDashboardCards(cached, cachedCusts);
       }
+      if (!force && cachedStats && allCustomers && allCustomers.length) {
+        return;
+      }
+      showTopLoader();
       try {
         const [stats, custs] = await Promise.all([
           apiRequest(`/api/stats`),
@@ -1676,12 +1764,15 @@
               </div>`;
           }
         }
+      } finally {
+        hideTopLoader();
       }
     }
 
     function renderRecentCustomers(custs) {
       const container = document.getElementById('dashboardRecentList');
-      if (!custs.length) {
+      if (!container) return;
+      if (!custs || !custs.length) {
         container.innerHTML = `
           <div class="empty-box">
             <div class="empty-icon-wrap">
@@ -1707,13 +1798,28 @@
       if (cached && cached.length > 0) {
         allCustomers = cached;
         renderFilteredCustomers();
-      } else if (!container.children.length) {
-        container.innerHTML = '<div class="spinner-box"><div class="spinner"></div></div>';
       }
-
+      if (!force && allCustomers && allCustomers.length > 0) {
+        return;
+      }
+      showTopLoader();
       try {
         const custs = await apiRequest(`/api/customers`);
         allCustomers = custs;
+        setLocalCache('dh_customers', custs);
+        renderFilteredCustomers();
+      } catch (err) {
+        if (!allCustomers || allCustomers.length === 0) {
+          container.innerHTML = `
+            <div class="empty-box">
+              <div class="empty-title">Aloqa xatosi</div>
+              <div class="empty-sub">Internet aloqasini tekshiring</div>
+            </div>`;
+        }
+      } finally {
+        hideTopLoader();
+      }
+    }
         setLocalCache('dh_customers', custs);
         renderFilteredCustomers();
       } catch (err) {
@@ -2379,14 +2485,17 @@
     function setupAmountFormatter(elId) {
       const el = document.getElementById(elId);
       if (!el) return;
-      el.addEventListener('input', function() {
-        const clean = this.value.replace(/\D/g, '');
+      const format = function() {
+        const clean = el.value.replace(/\D/g, '');
         if (!clean) {
-          this.value = '';
+          el.value = '';
           return;
         }
-        this.value = clean.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-      });
+        el.value = clean.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+      };
+      el.addEventListener('input', format);
+      el.addEventListener('keyup', format);
+      el.addEventListener('paste', () => setTimeout(format, 10));
     }
 
     function detectCountryFromPhone(str) {
@@ -2689,17 +2798,25 @@
         statsSelectedDate = targetDate;
       }
 
-      // 1. Agar keshda ma'lumot bo'lsa, DARHOL (0 ms) chizamiz — oq ekran va aylanuvchi spinner bo'lmaydi!
-      if (cachedStats) {
-        renderStatsView(cachedStats);
-      } else if (!container.children.length) {
-        container.innerHTML = '<div class="spinner-box"><div class="spinner"></div></div>';
+      // 1. Agar keshda ma'lumot bo'lsa, DARHOL (0 ms) chizamiz — aylanuvchi dumaloq spinner bo'lmaydi!
+      const cached = cachedStats || getLocalCache('dh_stats');
+      if (cached) {
+        cachedStats = cached;
+        renderStatsView(cached);
       }
 
+      const isToday = !targetDate || targetDate === getLocalDateString();
+      if (cachedStats && isToday && statsPeriod !== 'custom') {
+        // Bugungi statistika allaqachon bootstrapdan to'liq yuklangan, qayta so'rov shart emas!
+        return;
+      }
+
+      showTopLoader();
       try {
         const url = targetDate ? `/api/stats?date=${targetDate}` : `/api/stats`;
         const stats = await apiRequest(url);
         cachedStats = stats;
+        setLocalCache('dh_stats', stats);
         renderStatsView(stats);
       } catch (err) {
         if (!cachedStats) {
@@ -2709,6 +2826,8 @@
               <div class="empty-sub">${escHtml(err.message)}</div>
             </div>`;
         }
+      } finally {
+        hideTopLoader();
       }
     }
 
@@ -3118,26 +3237,33 @@
       // 1. Agar role=customer bo'lsa darhol bottomNav yashirilsin
       if (paramRole === 'customer') {
         if (nav) nav.style.display = 'none';
+        document.documentElement.classList.add('is-customer-role');
       }
 
-      // 2. Mahalliy tezkor kesh (0.01 soniyada ochiladi)
+      // 2. Mahalliy tezkor keshdan DARHOL (0.01 soniyada) chizamiz!
       const cachedMe = getLocalCache('dh_user_me');
       const cachedCustData = getLocalCache('dh_customer_data');
       const cachedStatsData = getLocalCache('dh_stats');
+      const cachedCustsData = getLocalCache('dh_customers') || [];
 
       if (paramRole === 'customer' || (cachedMe && cachedMe.role === 'customer' && !urlParams.has('shop_id'))) {
         if (nav) nav.style.display = 'none';
+        document.documentElement.classList.add('is-customer-role');
         if (cachedCustData && cachedCustData.customer) {
           renderCustomerPortal(cachedCustData);
         }
-      } else if (cachedMe && cachedMe.role === 'admin' && !paramRole) {
+      } else {
+        // Admin holati: darhol dashboard va mijozlarni chizamiz!
         if (nav) nav.style.display = 'flex';
+        document.documentElement.classList.remove('is-customer-role');
         if (cachedStatsData) {
-          showScreen('dashboard', false);
-          renderDashboardCards(cachedStatsData, getLocalCache('dh_customers') || []);
+          cachedStats = cachedStatsData;
+          allCustomers = cachedCustsData;
+          renderDashboardCards(cachedStatsData, cachedCustsData);
         }
       }
 
+      showTopLoader();
       try {
         let endpoint = '/api/me';
         const q = [];
@@ -3152,18 +3278,32 @@
         if (me.role === 'customer') {
           // FAQAT MIJOZ KO'RINISHI:
           if (nav) nav.style.display = 'none';
+          document.documentElement.classList.add('is-customer-role');
           if (me.customer) setLocalCache('dh_customer_data', me);
           renderCustomerPortal(me);
         } else {
           // ADMIN KO'RINISHI:
           if (nav) nav.style.display = 'flex';
+          document.documentElement.classList.remove('is-customer-role');
           if (me.shop_id) shopData.shopId = me.shop_id;
           if (me.admin?.shop_name) {
-            const el = document.getElementById('shopNameDisplay');
+            shopData.shopName = me.admin.shop_name;
+            const el = document.getElementById('headerShopTitle');
             if (el) el.textContent = me.admin.shop_name;
+            const idEl = document.getElementById('shopIdText');
+            if (idEl) idEl.textContent = me.shop_id || 'Ulangan';
           }
-          showScreen('dashboard', false);
-          loadDashboard();
+          if (me.stats) {
+            cachedStats = me.stats;
+            setLocalCache('dh_stats', me.stats);
+          }
+          if (me.customers) {
+            allCustomers = me.customers;
+            setLocalCache('dh_customers', me.customers);
+          }
+          renderDashboardCards(cachedStats, allCustomers);
+          if (currentScreen === 'customers') renderFilteredCustomers();
+          if (currentScreen === 'stats') renderStatsView(cachedStats);
         }
       } catch (err) {
         // Fallback: Agar mijoz roli bo'lsa yoki admin bo'lmasa — ASLO adminga o'tmaymiz!
@@ -3172,11 +3312,9 @@
           if (!cachedCustData) {
             renderCustomerPortal({ role: 'customer', customer: null, debts: [] });
           }
-        } else if (!cachedMe || cachedMe.role === 'admin') {
-          if (nav) nav.style.display = 'flex';
-          showScreen('dashboard', false);
-          loadDashboard();
         }
+      } finally {
+        hideTopLoader();
       }
     }
 

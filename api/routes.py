@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import time
@@ -434,6 +435,54 @@ async def handle_customer_delete(request: web.Request):
     invalidate_api_cache()
     return web.json_response({"success": True})
 
+async def _get_admin_bootstrap_data(admin: dict, shop_id: str) -> dict:
+    """Admin uchun barcha boshlang'ich ma'lumotlarni (stats + customers) bir so'rovda parallel yig'ish (0.01s javob)"""
+    now = time.time()
+    cache_stats_key = f"{shop_id}:today"
+    cache_custs_key = f"{shop_id}::all"
+    
+    stats_data = None
+    if cache_stats_key in _stats_memory_cache:
+        ts, s = _stats_memory_cache[cache_stats_key]
+        if now - ts < CACHE_TTL:
+            stats_data = s
+            
+    custs_data = None
+    if cache_custs_key in _customers_memory_cache:
+        ts, c = _customers_memory_cache[cache_custs_key]
+        if now - ts < CACHE_TTL:
+            custs_data = c
+            
+    tasks = []
+    need_stats = stats_data is None
+    need_custs = custs_data is None
+    
+    if need_stats:
+        tasks.append(get_admin_stats(shop_id))
+    if need_custs:
+        tasks.append(get_customers_list(shop_id))
+        
+    if tasks:
+        results = await asyncio.gather(*tasks)
+        idx = 0
+        if need_stats:
+            stats_data = results[idx]
+            stats_data["shop_name"] = admin.get("shop_name") or "Do'kon"
+            stats_data["shop_id"] = shop_id
+            _stats_memory_cache[cache_stats_key] = (now, stats_data)
+            idx += 1
+        if need_custs:
+            custs_data = results[idx]
+            _customers_memory_cache[cache_custs_key] = (now, custs_data)
+            
+    return {
+        "role": "admin",
+        "admin": admin,
+        "shop_id": shop_id,
+        "stats": stats_data,
+        "customers": custs_data
+    }
+
 async def handle_get_me(request: web.Request):
     """Foydalanuvchi roli va ma'lumotlarini aniqlash (Admin yoki Mijoz)"""
     role_param = request.query.get("role", "").strip().lower()
@@ -466,11 +515,8 @@ async def handle_get_me(request: web.Request):
                 pass
                 
         if admin:
-            return web.json_response({
-                "role": "admin",
-                "admin": admin,
-                "shop_id": admin["shop_id"]
-            })
+            bootstrap = await _get_admin_bootstrap_data(admin, admin["shop_id"])
+            return web.json_response(bootstrap)
             
         custs = await get_customer_by_telegram_id(uid)
         if custs:
@@ -497,15 +543,20 @@ async def handle_get_me(request: web.Request):
             "debts": []
         })
 
-    # 4. Standart holatda Admin do'koni
+    # 4. Standart holatda Admin do'koni (Stats va Customers bilan birga)
     shop_id = await resolve_shop_id(request)
     admin = await get_admin_by_shop_id(shop_id)
     if admin:
         admin["full_name"] = resolve_admin_label(admin.get("telegram_id"), admin.get("full_name"))
+        bootstrap = await _get_admin_bootstrap_data(admin, shop_id)
+        return web.json_response(bootstrap)
+
     return web.json_response({
         "role": "admin",
-        "admin": admin,
-        "shop_id": shop_id
+        "admin": None,
+        "shop_id": shop_id,
+        "stats": None,
+        "customers": []
     })
 
 async def handle_index(request: web.Request):

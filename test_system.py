@@ -147,6 +147,16 @@ async def run_tests():
     assert stats_json["shop_id"] == shop_id
     print(f"✅ REST API: /api/stats/{shop_id} muvaffaqiyatli javob berdi!")
 
+    # GET /api/me (Ultra-tezkor All-In-One bootstrap)
+    res_me = await client.get(f"/api/me?user_id={test_tid}")
+    assert res_me.status == 200
+    me_json = await res_me.json()
+    assert me_json["role"] == "admin"
+    assert me_json["stats"] is not None
+    assert "daily" in me_json["stats"]
+    assert isinstance(me_json["customers"], list)
+    print("✅ REST API: /api/me all-in-one bootstrap muvaffaqiyatli javob berdi!")
+
     # GET /api/customers/{shop_id}
     res_cust = await client.get(f"/api/customers/{shop_id}")
     assert res_cust.status == 200
