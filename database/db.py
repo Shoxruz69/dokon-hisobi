@@ -176,7 +176,7 @@ async def init_db():
                     id SERIAL PRIMARY KEY,
                     debt_id INTEGER NOT NULL REFERENCES debts(id) ON DELETE CASCADE,
                     customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-                    type VARCHAR(30) CHECK(type IN ('reminder_1day','reminder_3day','overdue','manual')),
+                    type VARCHAR(50),
                     sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                     success BOOLEAN DEFAULT TRUE,
                     error_message TEXT
@@ -260,7 +260,7 @@ async def init_db():
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     debt_id INTEGER NOT NULL,
                     customer_id INTEGER NOT NULL,
-                    type TEXT CHECK(type IN ('reminder_1day','reminder_3day','overdue','manual')),
+                    type TEXT,
                     sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     success BOOLEAN DEFAULT TRUE,
                     error_message TEXT,

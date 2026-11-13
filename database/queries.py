@@ -466,10 +466,13 @@ async def mark_reminder_sent(debt_id: int):
 async def log_notification(debt_id: int, customer_id: int, ntype: str, 
                            success: bool, error_msg: Optional[str] = None):
     """Xabarnoma logini yozish"""
-    await db_execute_insert("""
-        INSERT INTO notifications_log (debt_id, customer_id, type, success, error_message)
-        VALUES (?, ?, ?, ?, ?)
-    """, debt_id, customer_id, ntype, success, error_msg)
+    try:
+        await db_execute_insert("""
+            INSERT INTO notifications_log (debt_id, customer_id, type, success, error_message)
+            VALUES (?, ?, ?, ?, ?)
+        """, debt_id, customer_id, ntype, success, error_msg)
+    except Exception as e:
+        logger.warning(f"log_notification yozishda ogohlantirish: {e}")
 
 async def get_all_customers_with_active_debts() -> List[dict]:
     """Qarzi bor barcha mijozlar va ularning faol/kechikkan qarzlari ro'yxati (19:00 xabarlari uchun)"""
@@ -491,8 +494,7 @@ async def get_all_customers_with_active_debts() -> List[dict]:
             d.debt_date
         FROM customers c
         JOIN debts d ON d.customer_id = c.id AND d.status IN ('active', 'overdue')
-        JOIN admins a ON a.shop_id = c.shop_id
-        WHERE c.telegram_id IS NOT NULL
+        LEFT JOIN admins a ON a.shop_id = c.shop_id
         ORDER BY c.id, d.due_date ASC
     """)
     

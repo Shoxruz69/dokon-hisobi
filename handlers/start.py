@@ -411,14 +411,15 @@ async def cmd_trigger_reminders(message: Message):
         return
         
     from utils.scheduler import send_reminders
-    wait_msg = await message.answer("⏳ <b>Qarzdor mijozlarga 19:00 eslatmalari yuborilmoqda...</b>", parse_mode="HTML")
-    res = await send_reminders(message.bot)
+    wait_msg = await message.answer("⏳ <b>Qarzdor mijozlarga 19:00 eslatmalari yuborilmoqda va hisobot tayyorlanmoqda...</b>", parse_mode="HTML")
+    res = await send_reminders(message.bot, manual_admin_id=user_id)
     
     await wait_msg.edit_text(
-        f"✅ <b>Eslatmalar yuborildi!</b>\n\n"
-        f"👥 Qarzi bor mijozlar soni: <b>{res.get('total', 0)} ta</b>\n"
-        f"📨 Yuborilgan xabarlar: <b>{res.get('sent', 0)} ta</b>\n"
-        f"⚠️ Yuborilmadi: <b>{res.get('failed', 0)} ta</b>\n\n"
-        f"ℹ️ <i>Eslatmalar har kuni soat 19:00 da avtomatik ravishda barcha qarzdorlarga bot orqali yuboriladi.</i>",
+        f"✅ <b>19:00 Eslatmalar jarayoni yakunlandi!</b>\n\n"
+        f"👥 Jami qarzdorlar: <b>{res.get('total', 0)} ta</b>\n"
+        f"🟢 SMS borganlar: <b>{res.get('sent', 0)} ta</b>\n"
+        f"🟡 Botga ulanmaganlar: <b>{res.get('unlinked', 0)} ta</b>\n"
+        f"🔴 Xatolik bo'lganlar: <b>{res.get('failed', 0)} ta</b>\n\n"
+        f"📋 <i>Batafsil ro'yxat (kimlarga bordi va kimlarga bormadi) xabarlarda yuborildi.</i>",
         parse_mode="HTML"
     )
