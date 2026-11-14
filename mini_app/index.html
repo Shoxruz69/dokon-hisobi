@@ -2154,6 +2154,12 @@
       document.getElementById('inp-pay-note').value = '';
       clearFieldError('pay-amount');
 
+      const btnPay = document.getElementById('btnSubmitPayment');
+      if (btnPay) {
+        btnPay.disabled = false;
+        btnPay.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> To'lovni o'chirish`;
+      }
+
       const modal = document.getElementById('modalPayment');
       modal.classList.add('show');
       haptic('impact', 'medium');
@@ -2206,12 +2212,23 @@
         haptic('notification', 'success');
         document.getElementById('modalPayment').classList.remove('show');
         showToast(`${formatMoney(res.paid_amount)} to'landi! Qolgan qarz: ${formatMoney(res.remaining_debt)}`, 'success');
+
+        // Optimistik tezkor yangilash (0 ms kutish)
+        if (allCustomers && allCustomers.length) {
+          const c = allCustomers.find(item => item.id === activeCustomerId);
+          if (c) c.total_debt = res.remaining_debt;
+          setLocalCache('dh_customers', allCustomers);
+        }
+        if (currentCustomerDetail && currentCustomerDetail.id === activeCustomerId) {
+          currentCustomerDetail.total_debt = res.remaining_debt;
+        }
+
         cachedStats = null;
         try {
           localStorage.removeItem('dh_stats');
-          localStorage.removeItem('dh_customers');
           localStorage.removeItem('dh_user_me');
         } catch(e) {}
+
         openCustomerDetail(activeCustomerId);
         loadCustomers(true);
         loadDashboard(true);
@@ -2220,7 +2237,7 @@
         showToast(err.message, 'error');
       } finally {
         btn.disabled = false;
-        btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> To'lovni kiritish`;
+        btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> To'lovni o'chirish`;
       }
     }
 
@@ -2242,6 +2259,12 @@
       clearFieldError('adddebt-amount');
       clearFieldError('adddebt-desc');
       clearFieldError('adddebt-date');
+
+      const btnDebt = document.getElementById('btnSubmitAddDebt');
+      if (btnDebt) {
+        btnDebt.disabled = false;
+        btnDebt.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Qarzni saqlash`;
+      }
 
       // Standart 15 kunlik to'lov muddati
       const d = new Date();
@@ -2314,12 +2337,23 @@
         haptic('notification', 'success');
         document.getElementById('modalAddDebt').classList.remove('show');
         showToast(`${formatMoney(amountVal)} qarz qo'shildi! Jami: ${formatMoney(res.total_debt)}`, 'success');
+
+        // Optimistik tezkor yangilash (0 ms)
+        if (allCustomers && allCustomers.length) {
+          const c = allCustomers.find(item => item.id === activeCustomerId);
+          if (c) c.total_debt = res.total_debt;
+          setLocalCache('dh_customers', allCustomers);
+        }
+        if (currentCustomerDetail && currentCustomerDetail.id === activeCustomerId) {
+          currentCustomerDetail.total_debt = res.total_debt;
+        }
+
         cachedStats = null;
         try {
           localStorage.removeItem('dh_stats');
-          localStorage.removeItem('dh_customers');
           localStorage.removeItem('dh_user_me');
         } catch(e) {}
+
         openCustomerDetail(activeCustomerId);
         loadCustomers(true);
         loadDashboard(true);
@@ -2755,21 +2789,46 @@
         haptic('notification', 'success');
         showToast(res.is_new ? "Yangi mijoz saqlandi" : "Qarz qo'shildi", "success");
 
-        // 1. Keshni tozalash
-        cachedStats = null;
-        allCustomers = [];
-        try {
-          localStorage.removeItem('dh_stats');
-          localStorage.removeItem('dh_customers');
-          localStorage.removeItem('dh_user_me');
-        } catch(e) {}
+        // 1. Optimistik yangilash: mijozlar ro'yxatini bo'shatmasdan darhol yangilaymiz (0ms kutish!)
+        const newCustObj = {
+          id: res.customer_id,
+          shop_id: payload.shop_id,
+          full_name: payload.full_name,
+          phone: payload.phone,
+          total_debt: res.total_debt,
+          active_debts: 1,
+          overdue_debts: 0,
+          nearest_due: payload.due_date,
+          created_at: new Date().toISOString()
+        };
+
+        if (allCustomers && allCustomers.length) {
+          const idx = allCustomers.findIndex(c => c.id === res.customer_id);
+          if (idx >= 0) {
+            allCustomers[idx] = { ...allCustomers[idx], total_debt: res.total_debt };
+          } else {
+            allCustomers.unshift(newCustObj);
+          }
+        } else {
+          allCustomers = [newCustObj];
+        }
+        setLocalCache('dh_customers', allCustomers);
 
         // 2. Formani tozalash
         resetForm();
 
-        // 3. Majburiy yangi ma'lumotlarni serverdan tortib olib ko'rsatish
+        // 3. Darhol mijozlar ekraniga o'tish va chizish (0ms!)
         showScreen('customers', false);
-        await loadCustomers(true);
+        renderFilteredCustomers();
+
+        // 4. Keshni fon rejimida tozalash va ma'lumotlarni fonda yangilash (UI qotmaydi!)
+        cachedStats = null;
+        try {
+          localStorage.removeItem('dh_stats');
+          localStorage.removeItem('dh_user_me');
+        } catch(e) {}
+
+        loadCustomers(true);
         loadDashboard(true);
       } catch (err) {
         haptic('notification', 'error');

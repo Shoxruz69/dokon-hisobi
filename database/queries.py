@@ -166,29 +166,25 @@ async def add_customer(
     
     is_new = False
     if not customer:
+        new_total = float(amount)
         customer_id = await db_execute_insert("""
             INSERT INTO customers (shop_id, full_name, phone, telegram_id, notes, total_debt)
-            VALUES (?, ?, ?, ?, ?, 0)
-        """, shop_id, full_name.strip(), clean_phone, telegram_id, notes)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, shop_id, full_name.strip(), clean_phone, telegram_id, notes, new_total)
         is_new = True
     else:
         customer_id = customer["id"]
+        new_total = round(float(customer.get("total_debt") or 0.0) + float(amount), 2)
         if telegram_id:
-            await db_execute("UPDATE customers SET telegram_id = ? WHERE id = ?", telegram_id, customer_id)
+            await db_execute("UPDATE customers SET telegram_id = ?, total_debt = ? WHERE id = ?", telegram_id, new_total, customer_id)
+        else:
+            await db_execute("UPDATE customers SET total_debt = ? WHERE id = ?", new_total, customer_id)
 
     # 2. Qarzni kiritish (qaysi admin qo'shgani bilan)
     debt_id = await db_execute_insert("""
         INSERT INTO debts (customer_id, shop_id, amount, description, debt_date, due_date, status, created_by_admin_id, created_by_admin_name)
         VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)
     """, customer_id, shop_id, float(amount), desc_val, d_date, d_due, admin_id, resolved_name)
-
-    # 3. Jami qarzni qayta hisoblash
-    total_row = await db_fetch_one(
-        "SELECT COALESCE(SUM(amount), 0) as total FROM debts WHERE customer_id = ? AND status IN ('active', 'overdue')",
-        customer_id
-    )
-    new_total = float(total_row["total"]) if total_row else float(amount)
-    await db_execute("UPDATE customers SET total_debt = ? WHERE id = ?", new_total, customer_id)
 
     return {
         "customer_id": customer_id,
@@ -764,11 +760,7 @@ async def record_customer_payment(
             remaining_to_deduct = 0
             break
 
-    total_row = await db_fetch_one(
-        "SELECT COALESCE(SUM(amount), 0) as total FROM debts WHERE customer_id = ? AND status IN ('active', 'overdue')",
-        customer_id
-    )
-    new_total = float(total_row["total"]) if total_row else 0.0
+    new_total = max(0.0, round(total_debt - actual_pay, 2))
     await db_execute("UPDATE customers SET total_debt = ? WHERE id = ?", new_total, customer_id)
 
     admin = await get_admin_by_shop_id(shop_id)
@@ -801,16 +793,12 @@ async def add_debt_to_existing_customer(
     resolved_name = resolve_admin_label(admin_id, admin_name)
     desc_val = description.strip() if description and str(description).strip() else "Nasiya savdo"
 
+    new_total = round(float(cust.get("total_debt") or 0.0) + float(amount), 2)
     debt_id = await db_execute_insert("""
         INSERT INTO debts (customer_id, shop_id, amount, description, debt_date, due_date, status, admin_note, created_by_admin_id, created_by_admin_name)
         VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
     """, customer_id, shop_id, float(amount), desc_val, d_date, d_due, notes, admin_id, resolved_name)
 
-    total_row = await db_fetch_one(
-        "SELECT COALESCE(SUM(amount), 0) as total FROM debts WHERE customer_id = ? AND status IN ('active', 'overdue')",
-        customer_id
-    )
-    new_total = float(total_row["total"]) if total_row else float(amount)
     await db_execute("UPDATE customers SET total_debt = ? WHERE id = ?", new_total, customer_id)
 
     admin = await get_admin_by_shop_id(shop_id)
