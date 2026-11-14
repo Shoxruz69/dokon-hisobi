@@ -985,25 +985,25 @@
       flex-shrink: 0;
     }
     .btn-action-pay {
-      background: #10b981;
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-      color: #ffffff;
-      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
-    }
-    .btn-action-pay:hover,
-    .btn-action-pay:active {
-      background: #059669;
-      transform: translateY(-1px);
-    }
-    .btn-action-add {
       background: #ef4444;
       background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
       color: #ffffff;
       box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
     }
+    .btn-action-pay:hover,
+    .btn-action-pay:active {
+      background: #dc2626;
+      transform: translateY(-1px);
+    }
+    .btn-action-add {
+      background: #10b981;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+    }
     .btn-action-add:hover,
     .btn-action-add:active {
-      background: #dc2626;
+      background: #059669;
       transform: translateY(-1px);
     }
 
@@ -1928,18 +1928,18 @@
               </div>
             </div>
 
-            <!-- IKKITA ASOSIY AMAL TUGMASI: TO'LOV QABUL QILISH VA YANA QARZ QO'SHISH -->
+            <!-- IKKITA ASOSIY AMAL TUGMASI: TO'LOV O'CHIRISH VA YANA QARZ QO'SHISH -->
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">
               <button class="btn-customer-action btn-action-pay" onclick="openPaymentModal(${existing.id})">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
-                  <line x1="12" y1="5" x2="12" y2="19"/>
                   <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
-                <span>To'lov olish</span>
+                <span>To'lov o'chirish</span>
               </button>
 
               <button class="btn-customer-action btn-action-add" onclick="openAddDebtModal(${existing.id})">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
                   <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
                 <span>Qarz qo'shish</span>
@@ -2061,18 +2061,18 @@
               </div>
             </div>
 
-            <!-- IKKITA ASOSIY AMAL TUGMASI: TO'LOV QABUL QILISH VA YANA QARZ QO'SHISH -->
+            <!-- IKKITA ASOSIY AMAL TUGMASI: TO'LOV O'CHIRISH VA YANA QARZ QO'SHISH -->
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">
               <button class="btn-customer-action btn-action-pay" onclick="openPaymentModal(${data.id})">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
-                  <line x1="12" y1="5" x2="12" y2="19"/>
                   <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
-                <span>To'lov olish</span>
+                <span>To'lov o'chirish</span>
               </button>
 
               <button class="btn-customer-action btn-action-add" onclick="openAddDebtModal(${data.id})">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
                   <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
                 <span>Qarz qo'shish</span>
@@ -3360,7 +3360,7 @@
     <div class="custom-modal-card" onclick="event.stopPropagation()">
       <div class="modal-header">
         <div>
-          <h3 class="modal-title">To'lov qabul qilish</h3>
+          <h3 class="modal-title">To'lov o'chirish</h3>
           <p class="modal-sub" id="payModalCustomerInfo">Mijoz: —</p>
         </div>
         <button class="modal-close-btn" onclick="closePaymentModal()">
@@ -3409,7 +3409,7 @@
         <button class="btn-subtle" style="flex:1" onclick="closePaymentModal()">Bekor qilish</button>
         <button class="btn-main" style="flex:1.4;margin:0" id="btnSubmitPayment" onclick="submitPayment()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          To'lovni kiritish
+          To'lovni o'chirish
         </button>
       </div>
     </div>
