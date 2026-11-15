@@ -46,6 +46,7 @@ def adapt_query_for_pg(sql: str) -> str:
     # 2. SQLite sana funksiyalarini PostgreSQL ga almashtirish
     sql = re.sub(r"DATE\('now',\s*'\+7 days'\)", "(CURRENT_DATE + INTERVAL '7 days')", sql, flags=re.IGNORECASE)
     sql = re.sub(r"DATE\('now',\s*'-30 days'\)", "(CURRENT_DATE - INTERVAL '30 days')", sql, flags=re.IGNORECASE)
+    sql = re.sub(r"DATE\('now',\s*'-3 days'\)", "(CURRENT_DATE - INTERVAL '3 days')", sql, flags=re.IGNORECASE)
     sql = re.sub(r"DATE\('now'\)", "CURRENT_DATE", sql, flags=re.IGNORECASE)
     
     return sql

@@ -20,7 +20,7 @@ def build_admin_stats_text(stats: dict, shop_name: str) -> str:
         f"✅ <b>Oxirgi 30 kunda to'landi:</b> {month_paid}\n\n"
         f"👥 <b>Jami mijozlar:</b> {stats.get('total_customers', 0)} ta\n"
         f"🟡 <b>Faol qarzlar soni:</b> {stats.get('active_debts', 0)} ta\n"
-        f"🔴 <b>Muddati o'tgan qarzlar:</b> {stats.get('overdue_debts', 0)} ta\n"
+        f"🔴 <b>3 kundan beri to'lamagan:</b> {stats.get('overdue_debts', 0)} ta\n"
         f"📅 <b>Bu hafta to'lanishi kerak:</b> {stats.get('due_this_week', 0)} ta\n\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
         f"💡 <i>Mijozlar ro'yxatini ko'rish yoki yangi qarz qo'shish uchun menyudan foydalaning.</i>"
@@ -51,7 +51,7 @@ def build_customer_detail_text(customer: dict, debts: List[dict]) -> str:
         if status == "paid":
             badge = "✅ To'langan"
         elif status == "overdue":
-            badge = "🔴 Muddati o'tgan"
+            badge = "🔴 3 kundan beri to'lamagan"
         else:
             badge = "🟡 Faol"
             
@@ -92,7 +92,7 @@ def build_customer_debts_view(customer: dict, debts: List[dict]) -> str:
     for i, debt in enumerate(debts, 1):
         is_overdue = debt.get("status") == "overdue"
         icon = "🔴" if is_overdue else "🟡"
-        status_note = "\n   ⚠️ <i>To'lov muddati o'tib ketgan!</i>" if is_overdue else ""
+        status_note = "\n   ⚠️ <i>3 kundan beri to'lanmagan!</i>" if is_overdue else ""
         
         text += (
             f"{icon} <b>#{i} — {esc(debt['description'])}</b>\n"

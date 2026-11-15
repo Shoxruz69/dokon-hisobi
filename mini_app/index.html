@@ -1293,11 +1293,11 @@
             </svg>
           </div>
           <span class="badge badge-overdue">
-            <span class="badge-dot dot-danger"></span> Kechikkan
+            <span class="badge-dot dot-danger"></span> 3 kundan beri to'lamagan
           </span>
         </div>
         <div class="stat-value" id="stat-overdue">0 ta</div>
-        <div class="stat-label">Muddati o'tgan qarzlar</div>
+        <div class="stat-label">3 kundan beri to'lamagan</div>
       </div>
 
       <div class="stat-card">
@@ -1378,7 +1378,7 @@
     <div class="filter-pills">
       <button class="filter-pill active" onclick="setFilter('all', this)">Barchasi</button>
       <button class="filter-pill" onclick="setFilter('overdue', this)">
-        <span class="badge-dot dot-danger"></span> Kechikkan
+        <span class="badge-dot dot-danger"></span> 3 kundan beri to'lamagan
       </button>
       <button class="filter-pill" onclick="setFilter('active', this)">
         <span class="badge-dot dot-warning"></span> Faol
@@ -1968,7 +1968,7 @@
       const hasDebt = (c.total_debt || 0) > 0;
 
       let badge = hasOverdue 
-        ? `<span class="badge badge-overdue"><span class="badge-dot dot-danger"></span> Kechikkan</span>` 
+        ? `<span class="badge badge-overdue"><span class="badge-dot dot-danger"></span> 3 kundan beri to'lamagan</span>` 
         : hasDebt 
           ? `<span class="badge badge-active"><span class="badge-dot dot-warning"></span> Faol</span>` 
           : `<span class="badge badge-paid"><span class="badge-dot dot-success"></span> Qarz yo'q</span>`;
@@ -2067,7 +2067,7 @@
           let statusBadge = isPaid 
             ? `<span class="badge badge-paid"><span class="badge-dot dot-success"></span> To'langan</span>` 
             : isOverdue 
-              ? `<span class="badge badge-overdue"><span class="badge-dot dot-danger"></span> Kechikkan</span>` 
+              ? `<span class="badge badge-overdue"><span class="badge-dot dot-danger"></span> 3 kundan beri to'lamagan</span>` 
               : `<span class="badge badge-active"><span class="badge-dot dot-warning"></span> Faol</span>`;
 
           const adminTag = (d.created_by_admin_name || d.created_by_admin_id) ? `
@@ -3212,7 +3212,7 @@
             </div>
             <div class="stat-card danger-card">
               <div class="stat-value">${overall.overdue_debts || 0} ta</div>
-              <div class="stat-label">Kechikkan qarzlar</div>
+              <div class="stat-label">3 kundan beri to'lamagan</div>
             </div>
             <div class="stat-card">
               <div class="stat-value">${overall.active_debts || 0} ta</div>
@@ -3309,7 +3309,7 @@
                 </div>
                 <span class="badge ${isOverdue ? 'badge-overdue' : 'badge-active'}">
                   <span class="badge-dot ${isOverdue ? 'dot-danger' : 'dot-warning'}"></span>
-                  ${isOverdue ? 'Muddati o\'tgan' : 'To\'lanishi kerak'}
+                  ${isOverdue ? "3 kundan beri to'lamagan" : "To'lanishi kerak"}
                 </span>
               </div>
               <div class="debt-row">

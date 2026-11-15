@@ -201,6 +201,10 @@ async def add_customer(
 async def get_customers_list(shop_id: str, search: Optional[str] = None, 
                              status_filter: str = "all") -> List[dict]:
     """Do'konning barcha mijozlarini qidiruv bilan olish"""
+    try:
+        await update_overdue_statuses()
+    except Exception:
+        pass
     query = """
         SELECT c.*,
             COUNT(CASE WHEN d.status = 'active' THEN 1 END) as active_debts,
@@ -431,12 +435,22 @@ async def get_customer_active_debts(customer_id: int) -> List[dict]:
     """, customer_id)
 
 async def update_overdue_statuses() -> int:
-    """Muddati o'tgan qarzlarni avtomatik overdue holatiga o'tkazish"""
-    res = await db_execute("""
-        UPDATE debts 
-        SET status = 'overdue', updated_at = CURRENT_TIMESTAMP
-        WHERE due_date < CURRENT_DATE AND status = 'active'
-    """)
+    """To'lov muddati 3 kundan oshgan (3 kundan beri to'lamagan) qarzlarni 
+    avtomatik 'overdue' holatiga o'tkazish, 3 kundan kam bo'lsa 'active' holatda saqlash"""
+    cutoff = (date.today() - timedelta(days=3)).isoformat()
+    try:
+        await db_execute("""
+            UPDATE debts 
+            SET status = 'overdue', updated_at = CURRENT_TIMESTAMP
+            WHERE due_date <= ? AND status = 'active'
+        """, cutoff)
+        await db_execute("""
+            UPDATE debts 
+            SET status = 'active', updated_at = CURRENT_TIMESTAMP
+            WHERE due_date > ? AND status = 'overdue'
+        """, cutoff)
+    except Exception as e:
+        logger.warning(f"update_overdue_statuses xatosi: {e}")
     return 1
 
 async def get_debts_for_notification(days_ahead: int) -> List[dict]:
@@ -538,6 +552,10 @@ async def get_admin_stats(shop_id: str, target_date: Optional[str] = None) -> di
 
 async def get_detailed_stats(shop_id: str, target_date: Optional[str] = None) -> dict:
     """Kunlik (bugun yoki tanlangan sana), oylik va umumiy savdo/qarz statistikasi"""
+    try:
+        await update_overdue_statuses()
+    except Exception:
+        pass
     today_dt = date.today()
     if not target_date or target_date == "today":
         t_date = today_dt

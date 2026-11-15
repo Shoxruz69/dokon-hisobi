@@ -417,9 +417,11 @@ async def cmd_trigger_reminders(message: Message):
     await wait_msg.edit_text(
         f"✅ <b>19:00 Eslatmalar jarayoni yakunlandi!</b>\n\n"
         f"👥 Jami qarzdorlar: <b>{res.get('total', 0)} ta</b>\n"
+        f"🚨 3 kundan beri to'lamaganlar: <b>{res.get('overdue_3days', 0)} ta</b>\n"
         f"🟢 SMS borganlar: <b>{res.get('sent', 0)} ta</b>\n"
+        f"⏸️ 2 kunda bir rejimidagilar: <b>{res.get('skipped_2day', 0)} ta</b>\n"
         f"🟡 Botga ulanmaganlar: <b>{res.get('unlinked', 0)} ta</b>\n"
         f"🔴 Xatolik bo'lganlar: <b>{res.get('failed', 0)} ta</b>\n\n"
-        f"📋 <i>Batafsil ro'yxat (kimlarga bordi va kimlarga bormadi) xabarlarda yuborildi.</i>",
+        f"📋 <i>Batafsil ro'yxat va 3 kundan beri to'lamaganlar hisoboti yuqoridagi xabarlarda yuborildi.</i>",
         parse_mode="HTML"
     )
