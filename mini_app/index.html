@@ -2082,13 +2082,13 @@
               <div class="debt-header">
                 <div>
                   <div class="debt-desc">${escHtml(d.description)}</div>
-                  <div class="debt-amount-big">${formatMoney(d.amount)}</div>
+                  <div class="debt-amount-big" style="color:var(--primary)">+${formatMoney(d.amount)}</div>
                 </div>
                 ${statusBadge}
               </div>
               <div class="debt-row">
                 <span>Olingan sana:</span>
-                <b>${formatDateLong(d.debt_date)}</b>
+                <b>${formatDateTimeUz(d.created_at || d.debt_date)}</b>
               </div>
               <div class="debt-row">
                 <span>To'lov muddati:</span>
@@ -2097,14 +2097,9 @@
               ${isPaid ? `
                 <div class="debt-row" style="color:var(--primary);margin-top:4px">
                   <span>To'langan sana:</span>
-                  <b>${formatDateLong(d.paid_date)}</b>
+                  <b>${formatDateTimeUz(d.paid_date)}</b>
                 </div>
-              ` : `
-                <button class="btn-pay" onclick="payDebtItem(${d.id})">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                  To'landi deb belgilash
-                </button>
-              `}
+              ` : ''}
               ${adminTag}
             </div>`;
         }).join('') : `
@@ -2118,13 +2113,57 @@
             <div class="empty-sub">Barcha qarzlar to'langan</div>
           </div>`;
 
+        // Bugungi hisob-kitob (O'zbekiston / Farg'ona vaqti bo'yicha)
+        const todayStr = getLocalDateString();
+        let todayBorrowed = 0;
+        if (data.today_borrowed !== undefined && data.today_borrowed !== null) {
+          todayBorrowed = Number(data.today_borrowed);
+        } else if (data.debts && data.debts.length) {
+          data.debts.forEach(d => {
+            const dDate = (d.debt_date || d.created_at || '').substring(0, 10);
+            if (dDate === todayStr) todayBorrowed += Number(d.amount || 0);
+          });
+        }
+
+        let todayPaid = 0;
+        if (data.today_paid !== undefined && data.today_paid !== null) {
+          todayPaid = Number(data.today_paid);
+        } else if (data.payments && data.payments.length) {
+          data.payments.forEach(p => {
+            const pDate = (p.paid_at || '').substring(0, 10);
+            if (pDate === todayStr) todayPaid += Number(p.amount || 0);
+          });
+        }
+
+        const todaySummaryHtml = `
+          <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;margin:20px 0 12px;box-shadow:var(--shadow-sm)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <span style="font-size:13px;font-weight:700;color:var(--text-main);display:flex;align-items:center;gap:6px">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                Bugungi hisob-kitob
+              </span>
+              <span style="font-size:11px;font-weight:600;color:var(--primary);background:var(--primary-light);padding:3px 8px;border-radius:12px">Bugun</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div style="background:var(--bg-app);padding:10px;border-radius:var(--radius-sm);border:1px solid rgba(16,185,129,0.25)">
+                <div style="font-size:11px;color:var(--text-muted);font-weight:600">Bugun olingan qarz</div>
+                <div style="font-size:16px;font-weight:800;color:var(--primary);margin-top:3px">+${formatMoney(todayBorrowed)}</div>
+              </div>
+              <div style="background:var(--bg-app);padding:10px;border-radius:var(--radius-sm);border:1px solid rgba(239,68,68,0.25)">
+                <div style="font-size:11px;color:var(--text-muted);font-weight:600">Bugun berilgan to'lov</div>
+                <div style="font-size:16px;font-weight:800;color:var(--danger);margin-top:3px">-${formatMoney(todayPaid)}</div>
+              </div>
+            </div>
+          </div>
+        `;
+
         const paymentsHtml = data.payments && data.payments.length ? `
           <h4 class="section-title" style="margin:24px 0 12px">To'lovlar Tarixi (${data.payments.length})</h4>
           ${data.payments.map(p => `
-            <div class="debt-item-card" style="border-left:4px solid var(--primary)">
+            <div class="debt-item-card" style="border-left:4px solid var(--danger)">
               <div style="display:flex;justify-content:space-between;align-items:center">
-                <span style="font-size:16px;font-weight:800;color:var(--primary)">+${formatMoney(p.amount)}</span>
-                <span style="font-size:12px;color:var(--text-muted)">${formatDateLong(p.paid_at)}</span>
+                <span style="font-size:16px;font-weight:800;color:var(--danger)">-${formatMoney(p.amount)}</span>
+                <span style="font-size:12px;color:var(--text-muted)">${formatDateTimeUz(p.paid_at)}</span>
               </div>
               <div style="font-size:13px;color:var(--text-muted);margin-top:4px">
                 Izoh: <b>${escHtml(p.note || 'To\'lov')}</b>
@@ -2187,6 +2226,7 @@
           
           <h4 class="section-title" style="margin-bottom:12px">Qarzlar Tarixi (${data.debts?.length || 0})</h4>
           ${debtsHtml}
+          ${todaySummaryHtml}
           ${paymentsHtml}
         `;
       } catch (err) {
@@ -3252,6 +3292,39 @@
         const d = new Date(s);
         return `${d.getDate()}-${months[d.getMonth()]} ${d.getFullYear()}`;
       } catch (e) { return s; }
+    }
+
+    function formatDateTimeUz(s) {
+      if (!s) return '—';
+      try {
+        let dateStr = String(s).trim();
+        if (dateStr.length === 10 && dateStr.indexOf('-') === 4) {
+          const parts = dateStr.split('-');
+          return `${parseInt(parts[2], 10)}-${months[parseInt(parts[1], 10) - 1]} ${parts[0]}`;
+        }
+        if (!dateStr.includes('Z') && !dateStr.includes('+') && dateStr.includes(' ')) {
+          dateStr = dateStr.replace(' ', 'T') + 'Z';
+        }
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return String(s);
+
+        const formatter = new Intl.DateTimeFormat('en-GB', {
+          timeZone: 'Asia/Tashkent',
+          day: 'numeric',
+          month: 'numeric',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
+        const parts = formatter.formatToParts(d);
+        const map = {};
+        parts.forEach(p => map[p.type] = p.value);
+        const monthIdx = parseInt(map.month, 10) - 1;
+        return `${parseInt(map.day, 10)}-${months[monthIdx]} ${map.year}, ${map.hour}:${map.minute}`;
+      } catch (e) {
+        return formatDateLong(s);
+      }
     }
 
     function escHtml(s) {

@@ -2,6 +2,7 @@ import uuid
 import logging
 import asyncio
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from typing import Optional, List, Dict, Any
 
 from database.db import (
@@ -180,11 +181,12 @@ async def add_customer(
         else:
             await db_execute("UPDATE customers SET total_debt = ? WHERE id = ?", new_total, customer_id)
 
-    # 2. Qarzni kiritish (qaysi admin qo'shgani bilan)
+    # 2. Qarzni kiritish (qaysi admin qo'shgani bilan va O'zbekiston/Farg'ona vaqti bilan)
+    now_dt = datetime.now(ZoneInfo("Asia/Tashkent"))
     debt_id = await db_execute_insert("""
-        INSERT INTO debts (customer_id, shop_id, amount, description, debt_date, due_date, status, created_by_admin_id, created_by_admin_name)
-        VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)
-    """, customer_id, shop_id, float(amount), desc_val, d_date, d_due, admin_id, resolved_name)
+        INSERT INTO debts (customer_id, shop_id, amount, description, debt_date, due_date, status, created_by_admin_id, created_by_admin_name, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
+    """, customer_id, shop_id, float(amount), desc_val, d_date, d_due, admin_id, resolved_name, now_dt, now_dt)
 
     return {
         "customer_id": customer_id,
@@ -258,6 +260,21 @@ async def get_customer_detail(customer_id: int, shop_id: Optional[str] = None) -
     cust_dict = dict(cust)
     cust_dict["debts"] = debts
     cust_dict["payments"] = payments
+
+    # Bugungi hisob-kitob (O'zbekiston / Toshkent vaqti bo'yicha)
+    today_uz = datetime.now(ZoneInfo("Asia/Tashkent")).date().isoformat()
+    today_borrowed = sum(
+        float(d.get("amount") or 0) 
+        for d in debts 
+        if str(d.get("debt_date") or d.get("created_at") or "")[:10] == today_uz
+    )
+    today_paid = sum(
+        float(p.get("amount") or 0) 
+        for p in payments 
+        if str(p.get("paid_at") or "")[:10] == today_uz
+    )
+    cust_dict["today_borrowed"] = today_borrowed
+    cust_dict["today_paid"] = today_paid
     return cust_dict
 
 async def get_customer_payments(customer_id: int) -> List[dict]:
@@ -373,7 +390,7 @@ async def mark_debt_paid(debt_id: int, shop_id: Optional[str] = None,
 
     customer_id = debt["customer_id"]
     amount = float(debt["amount"])
-    now_dt = datetime.now()
+    now_dt = datetime.now(ZoneInfo("Asia/Tashkent"))
     resolved_name = resolve_admin_label(admin_id, admin_name)
 
     # 1. Qarzni paid ga o'tkazish
@@ -732,7 +749,7 @@ async def record_customer_payment(
 
     actual_pay = min(pay_amount, total_debt)
     remaining_to_deduct = actual_pay
-    now_dt = datetime.now()
+    now_dt = datetime.now(ZoneInfo("Asia/Tashkent"))
     default_note = note or "Qisman to'lov"
     resolved_name = resolve_admin_label(admin_id, admin_name)
 
@@ -811,11 +828,12 @@ async def add_debt_to_existing_customer(
     resolved_name = resolve_admin_label(admin_id, admin_name)
     desc_val = description.strip() if description and str(description).strip() else "Nasiya savdo"
 
+    now_dt = datetime.now(ZoneInfo("Asia/Tashkent"))
     new_total = round(float(cust.get("total_debt") or 0.0) + float(amount), 2)
     debt_id = await db_execute_insert("""
-        INSERT INTO debts (customer_id, shop_id, amount, description, debt_date, due_date, status, admin_note, created_by_admin_id, created_by_admin_name)
-        VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
-    """, customer_id, shop_id, float(amount), desc_val, d_date, d_due, notes, admin_id, resolved_name)
+        INSERT INTO debts (customer_id, shop_id, amount, description, debt_date, due_date, status, admin_note, created_by_admin_id, created_by_admin_name, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)
+    """, customer_id, shop_id, float(amount), desc_val, d_date, d_due, notes, admin_id, resolved_name, now_dt, now_dt)
 
     await db_execute("UPDATE customers SET total_debt = ? WHERE id = ?", new_total, customer_id)
 
