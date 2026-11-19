@@ -72,11 +72,12 @@ def build_customer_debts_view(customer: dict, debts: List[dict]) -> str:
     """Mijozning o'zi ko'radigan qarzlar hisoboti"""
     active_debts = [d for d in debts if d.get("status") in ("active", "overdue")]
     total = sum(d["amount"] for d in active_debts)
+    shop_title = customer.get("shop_name") or "Do'kon"
 
     if not active_debts or total <= 0:
         return (
             f"🎉 Salom, <b>{esc(customer['full_name'])}</b>!\n\n"
-            f"🏪 Do'kon: <b>{esc(customer.get('shop_name', 'Do\'kon'))}</b>\n\n"
+            f"🏪 Do'kon: <b>{esc(shop_title)}</b>\n\n"
             f"✅ <b>Tabriklaymiz, sizda hech qanday to'lanmagan qarz yo'q!</b>\n"
             f"Barcha to'lovlar to'liq amalga oshirilgan.\n\n"
             f"Hisob-kitoblar tarixini ko'rish uchun pastdagi <b>Shaxsiy hisob (Mini App)</b> tugmasini bosing:"
@@ -84,7 +85,7 @@ def build_customer_debts_view(customer: dict, debts: List[dict]) -> str:
     
     text = (
         f"👤 Salom, <b>{esc(customer['full_name'])}</b>! 👋\n"
-        f"🏪 Do'kon: <b>{esc(customer.get('shop_name', 'Do\'kon'))}</b>\n\n"
+        f"🏪 Do'kon: <b>{esc(shop_title)}</b>\n\n"
         f"💳 <b>Sizning qarzlaringiz:</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
     )
@@ -101,10 +102,11 @@ def build_customer_debts_view(customer: dict, debts: List[dict]) -> str:
             f"{status_note}\n\n"
         )
         
+    shop_phone = customer.get('shop_phone') or "Bog'lanish raqami belgilanmagan"
     text += (
         f"━━━━━━━━━━━━━━━━━━━━━\n"
         f"💸 <b>Jami to'lanishi kerak: {format_amount(total)}</b>\n\n"
-        f"📞 Do'kon bilan bog'lanish: <code>{esc(customer.get('shop_phone') or 'Bog\'lanish raqami belgilanmagan')}</code>"
+        f"📞 Do'kon bilan bog'lanish: <code>{esc(shop_phone)}</code>"
     )
     return text
 

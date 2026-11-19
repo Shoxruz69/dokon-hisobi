@@ -7,18 +7,11 @@ services:
     plan: free
     autoDeploy: true
     envVars:
-      - key: BOT_TOKEN
-        sync: false
-      - key: DATABASE_URL
-        sync: false
-      - key: ADMIN_TELEGRAM_ID
-        sync: false
       - key: MINI_APP_URL
-        sync: false
+        value: "https://dokon-hisobi.onrender.com"
       - key: ADMIN_SECRET_CODE
-        sync: false
+        value: DOKON2024
       - key: TIMEZONE
         value: Asia/Tashkent
       - key: WEB_SERVER_HOST
         value: 0.0.0.0
-

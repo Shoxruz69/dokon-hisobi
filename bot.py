@@ -31,17 +31,18 @@ logger = logging.getLogger("DokonHisobi")
 async def setup_bot_commands(bot: Bot):
     """Telegram menyusidagi komandalar va Menu tugmasini sozlash"""
     commands = [
-        BotCommand(command="start", description="Tizimni ishga tushirish"),
-        BotCommand(command="help", description="Yordam va ma'lumot"),
-        BotCommand(command="eslatma", description="Qarzdorlarga eslatma yuborish (Admin)")
+        BotCommand(command="start", description="Tizimni ishga tushirish / Mini App"),
+        BotCommand(command="help", description="Yordam va qo'llanma"),
+        BotCommand(command="eslatma", description="19:00 eslatmalarini yuborish (Admin)")
     ]
     try:
         await bot.set_my_commands(commands, scope=BotCommandScopeDefault())
-        if settings.MINI_APP_URL.lower().startswith("https://"):
+        mini_app_url = settings.MINI_APP_URL or "https://dokon-hisobi.onrender.com"
+        if mini_app_url.lower().startswith("https://"):
             await bot.set_chat_menu_button(
                 menu_button=MenuButtonWebApp(
-                    text="Do'kon Paneli",
-                    web_app=WebAppInfo(url=f"{settings.MINI_APP_URL}?v=2.1")
+                    text="📱 Mini App",
+                    web_app=WebAppInfo(url=f"{mini_app_url}?v=2.5")
                 )
             )
         logger.info("✅ Bot komandalari va Menu tugmasi muvaffaqiyatli o'rnatildi")
@@ -51,62 +52,74 @@ async def setup_bot_commands(bot: Bot):
 async def main():
     logger.info("🚀 'Dokon Hisobi' tizimi ishga tushirilmoqda...")
 
-    # 1. Ma'lumotlar bazasini initsializatsiya qilish
-    await init_db()
-
-    # 2. Aiogram Bot va Dispatcher yaratish
-    bot = Bot(
-        token=settings.BOT_TOKEN,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML)
-    )
-    dp = Dispatcher()
-
-    # 3. Middleware ulash
-    auth_middleware = AuthMiddleware()
-    dp.message.middleware(auth_middleware)
-    dp.callback_query.middleware(auth_middleware)
-
-    # 4. Routerlarni ro'yxatdan o'tkazish
-    dp.include_routers(
-        start_router,
-        common_router,
-        admin_customers_router,
-        admin_debts_router,
-        admin_stats_router,
-        customer_debts_router
-    )
-
-    # 5. Komandalarni Telegramga yozish
-    await setup_bot_commands(bot)
-
-    # 6. Eslatmalar schedulerini ishga tushirish
-    scheduler = setup_scheduler(bot)
-    scheduler.start()
-    logger.info("⏰ Kunlik eslatmalar scheduleri faollashtirildi (19:00)")
-
-    # 7. Mini App va REST API uchun aiohttp veb serverini ishga tushirish
+    # 1. Mini App va REST API veb-serverini ENG BIRINCHI navbatda ishga tushirish (Render 502 bermasligi uchun)
     web_app = create_web_app()
     runner = web.AppRunner(web_app)
     await runner.setup()
     site = web.TCPSite(runner, host=settings.WEB_SERVER_HOST, port=settings.WEB_SERVER_PORT)
     await site.start()
-    logger.info(f"🌐 Mini App va REST API serveri ishga tushdi: http://localhost:{settings.WEB_SERVER_PORT}")
+    logger.info(f"🌐 Mini App va REST API veb-serveri muvaffaqiyatli ishga tushdi: http://0.0.0.0:{settings.WEB_SERVER_PORT}")
 
-    # 8. Bot pollingni boshlash
-    await bot.delete_webhook(drop_pending_updates=False)
-    logger.info("🤖 Bot xabarlarni qabul qilishga tayyor!")
-
+    # 2. Ma'lumotlar bazasini initsializatsiya qilish
     try:
+        await init_db()
+        logger.info("✅ Ma'lumotlar bazasi tayyor")
+    except Exception as e:
+        logger.error(f"⚠️ Baza ulanishida xatolik: {e}")
+
+    # 3. Aiogram Bot va Dispatcher yaratish
+    bot = None
+    scheduler = None
+    try:
+        bot = Bot(
+            token=settings.BOT_TOKEN,
+            default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+        )
+        dp = Dispatcher()
+
+        # 4. Middleware ulash
+        auth_middleware = AuthMiddleware()
+        dp.message.middleware(auth_middleware)
+        dp.callback_query.middleware(auth_middleware)
+
+        # 5. Routerlarni ro'yxatdan o'tkazish
+        dp.include_routers(
+            start_router,
+            common_router,
+            admin_customers_router,
+            admin_debts_router,
+            admin_stats_router,
+            customer_debts_router
+        )
+
+        # 6. Komandalar va menyu tugmasini Telegramga o'rnatish
+        await setup_bot_commands(bot)
+
+        # 7. Eslatmalar schedulerini ishga tushirish
+        scheduler = setup_scheduler(bot)
+        scheduler.start()
+        logger.info("⏰ Kunlik eslatmalar scheduleri faollashtirildi (19:00)")
+
+        # 8. Webhook tozalash va Pollingni boshlash
+        await bot.delete_webhook(drop_pending_updates=False)
+        logger.info("🤖 Bot xabarlarni qabul qilishga tayyor!")
+
         await dp.start_polling(bot)
+    except Exception as e:
+        logger.error(f"❌ Telegram Bot xatoligi: {e}", exc_info=True)
+        # Server 502 bermasligi uchun veb-server ishlab turishini ta'minlaymiz
+        while True:
+            await asyncio.sleep(3600)
     finally:
         logger.info("🛑 Tizim to'xtatilmoqda...")
-        scheduler.shutdown()
+        if scheduler:
+            scheduler.shutdown()
         await runner.cleanup()
-        await bot.session.close()
+        if bot:
+            await bot.session.close()
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logger.info("Bot to'xtatildi.")
-

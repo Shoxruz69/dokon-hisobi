@@ -46,7 +46,8 @@ class CustomerVerification(StatesGroup):
 
 def get_customer_webapp_kb(customer_id: int) -> InlineKeyboardMarkup:
     """Mijoz uchun o'z qarzlarini ko'rsatuvchi Mini App tugmasi"""
-    url = f"{settings.MINI_APP_URL}?role=customer&customer_id={customer_id}&v=2.2"
+    base_url = settings.MINI_APP_URL or "https://dokon-hisobi.onrender.com"
+    url = f"{base_url}?role=customer&customer_id={customer_id}&v=2.5"
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📱 Mening qarzlarim (Mini App)", web_app=WebAppInfo(url=url))]
     ])
@@ -114,6 +115,7 @@ async def cmd_start(message: Message, state: FSMContext, admin: dict = None):
         for cust in customers:
             debts = await get_customer_active_debts(cust["id"])
             total_debt = sum(d["amount"] for d in debts if d.get("status") in ("active", "overdue"))
+            shop_title = cust.get("shop_name") or "Do'kon"
             
             if total_debt > 0 and debts:
                 nearest_due = debts[0]["due_date"]
@@ -123,7 +125,7 @@ async def cmd_start(message: Message, state: FSMContext, admin: dict = None):
                     
                 await message.answer(
                     f"Assalomu alaykum, <b>{esc(cust['full_name'])}</b>! 👋\n\n"
-                    f"Sizning <b>{esc(cust.get('shop_name', 'Do\'kon'))}</b> do'konidan qarzingiz bor:\n\n"
+                    f"Sizning <b>{esc(shop_title)}</b> do'konidan qarzingiz bor:\n\n"
                     f"💰 <b>Qarzingiz:</b> <b>{format_amount(total_debt)}</b>\n"
                     f"⏰ <b>To'lash sanasi:</b> <b>{format_date_uz(nearest_due)}</b>\n"
                     f"📦 <b>Nima olingan:</b> {esc(products)}\n\n"
@@ -134,7 +136,7 @@ async def cmd_start(message: Message, state: FSMContext, admin: dict = None):
             else:
                 await message.answer(
                     f"Assalomu alaykum, <b>{esc(cust['full_name'])}</b>! 👋\n\n"
-                    f"<b>{esc(cust.get('shop_name', 'Do\'kon'))}</b> do'konida sizning hech qanday qarzingiz yo'q. "
+                    f"<b>{esc(shop_title)}</b> do'konida sizning hech qanday qarzingiz yo'q. "
                     f"Barcha to'lovlar to'liq amalga oshirilgan! ✅\n\n"
                     f"Hisob-kitoblar tarixini ko'rish uchun pastdagi tugmani bosing:",
                     parse_mode="HTML",
@@ -360,9 +362,10 @@ async def process_customer_phone(message: Message, state: FSMContext):
             if len(debts) > 3:
                 products += f" va yana {len(debts) - 3} ta"
                 
+            shop_title = cust.get("shop_name") or "Do'kon"
             await message.answer(
                 f"Assalomu alaykum, <b>{esc(cust['full_name'])}</b>! 👋\n\n"
-                f"Sizning <b>{esc(cust.get('shop_name', 'Do\'kon'))}</b> do'konidan qarzingiz bor:\n\n"
+                f"Sizning <b>{esc(shop_title)}</b> do'konidan qarzingiz bor:\n\n"
                 f"💰 <b>Qarzingiz:</b> <b>{format_amount(total_debt)}</b>\n"
                 f"⏰ <b>To'lash sanasi:</b> <b>{format_date_uz(nearest_due)}</b>\n"
                 f"📦 <b>Nima olingan:</b> {esc(products)}\n\n"
@@ -371,9 +374,10 @@ async def process_customer_phone(message: Message, state: FSMContext):
                 reply_markup=get_customer_webapp_kb(cust["id"])
             )
         else:
+            shop_title = cust.get("shop_name") or "Do'kon"
             await message.answer(
                 f"Assalomu alaykum, <b>{esc(cust['full_name'])}</b>! 👋\n\n"
-                f"<b>{esc(cust.get('shop_name', 'Do\'kon'))}</b> do'konida sizning hech qanday qarzingiz yo'q. "
+                f"<b>{esc(shop_title)}</b> do'konida sizning hech qanday qarzingiz yo'q. "
                 f"Barcha to'lovlar to'liq amalga oshirilgan! ✅",
                 parse_mode="HTML",
                 reply_markup=get_customer_webapp_kb(cust["id"])

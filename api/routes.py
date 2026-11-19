@@ -581,9 +581,17 @@ async def handle_favicon(request: web.Request):
     """Favicon so'rovini qondirish"""
     return web.Response(text="", content_type="image/x-icon")
 
+async def handle_health(request: web.Request):
+    """Render va server salomatligini tekshirish uchun endpoint"""
+    return web.json_response({"status": "ok", "app": "dokon-hisobi", "version": "2.5"})
+
 def create_web_app() -> web.Application:
     """Aiohttp veb ilovasini yaratish"""
     app = web.Application(middlewares=[cors_middleware])
+    
+    # Health checks
+    app.router.add_get("/health", handle_health)
+    app.router.add_get("/ping", handle_health)
     
     # API endpoints
     app.router.add_get("/favicon.ico", handle_favicon)

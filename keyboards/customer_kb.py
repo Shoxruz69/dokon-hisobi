@@ -21,8 +21,9 @@ def get_phone_request_kb() -> ReplyKeyboardMarkup:
 def get_customer_main_kb(customer_id: Optional[int] = None) -> ReplyKeyboardMarkup:
     """Mijoz uchun menyu — faqat o'z qarzlari va do'kon bilan aloqa"""
     buttons = []
-    if customer_id and settings.MINI_APP_URL.lower().startswith("https://"):
-        url = f"{settings.MINI_APP_URL}?role=customer&customer_id={customer_id}&v=2.3"
+    base_url = settings.MINI_APP_URL or "https://dokon-hisobi.onrender.com"
+    if customer_id and base_url.lower().startswith("https://"):
+        url = f"{base_url}?role=customer&customer_id={customer_id}&v=2.5"
         buttons.append([KeyboardButton(text="💳 Mening qarzlarim", web_app=WebAppInfo(url=url))])
     else:
         buttons.append([KeyboardButton(text="💳 Mening qarzlarim")])
@@ -35,8 +36,9 @@ def get_customer_main_kb(customer_id: Optional[int] = None) -> ReplyKeyboardMark
 def get_customer_inline_kb(customer_id: Optional[int] = None) -> InlineKeyboardMarkup:
     """Mijoz inline yangilash va shaxsiy hisob tugmasi"""
     rows = []
-    if customer_id and settings.MINI_APP_URL.lower().startswith("https://"):
-        url = f"{settings.MINI_APP_URL}?role=customer&customer_id={customer_id}&v=2.3"
+    base_url = settings.MINI_APP_URL or "https://dokon-hisobi.onrender.com"
+    if customer_id and base_url.lower().startswith("https://"):
+        url = f"{base_url}?role=customer&customer_id={customer_id}&v=2.5"
         rows.append([InlineKeyboardButton(text="📱 Shaxsiy hisob (Mini App)", web_app=WebAppInfo(url=url))])
     rows.append([InlineKeyboardButton(text="🔄 Yangilash", callback_data="my_debts_refresh")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
