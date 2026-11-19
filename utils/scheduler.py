@@ -385,7 +385,8 @@ async def send_reminders(bot, manual_admin_id: Optional[int] = None) -> dict:
                 
             # SMS yuborish
             text = build_daily_reminder_text(cust, days_overdue=days_overdue)
-            web_app_url = f"{settings.MINI_APP_URL}?role=customer&customer_id={cust['customer_id']}&v=2.3"
+            base_url = settings.MINI_APP_URL or "https://dokon-hisobi.onrender.com"
+            web_app_url = f"{base_url}?role=customer&customer_id={cust['customer_id']}&v=2.5"
             keyboard = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="📱 Mening qarzlarim (Mini App)", web_app=WebAppInfo(url=web_app_url))]
             ])
@@ -483,11 +484,30 @@ async def keep_alive_ping():
                 except Exception:
                     pass
 
+async def _delayed_initial_check(bot):
+    await asyncio.sleep(15)
+    try:
+        logger.info("🚀 Dastlabki 3 kundan beri to'lamaganlarni tekshirish va eslatmalar...")
+        await send_reminders(bot)
+    except Exception as e:
+        logger.error(f"Dastlabki eslatmalar xatosi: {e}")
+
 def setup_scheduler(bot) -> AsyncIOScheduler:
     """Scheduler yaratish va ishga sozlash"""
     scheduler = AsyncIOScheduler(timezone="Asia/Tashkent")
     
-    # Har kuni kechqurun soat 19:00 da barcha qarzdor mijozlarga eslatma va adminga hisobot
+    # 1. Har kuni ertalab soat 10:00 da
+    scheduler.add_job(
+        send_reminders,
+        trigger=CronTrigger(hour=10, minute=0, timezone="Asia/Tashkent"),
+        args=[bot],
+        id="daily_reminders_10am",
+        name="Har kuni 10:00 qarz eslatmalari va Admin hisoboti",
+        replace_existing=True,
+        misfire_grace_time=7200
+    )
+
+    # 2. Har kuni kechqurun soat 19:00 da
     scheduler.add_job(
         send_reminders,
         trigger=CronTrigger(hour=19, minute=0, timezone="Asia/Tashkent"),
@@ -498,7 +518,7 @@ def setup_scheduler(bot) -> AsyncIOScheduler:
         misfire_grace_time=7200
     )
     
-    # Har 5 daqiqada Render Free uxlab qolmasligi uchun keep-alive
+    # 3. Har 5 daqiqada Render Free uxlab qolmasligi uchun keep-alive
     scheduler.add_job(
         keep_alive_ping,
         trigger="interval",
@@ -507,5 +527,11 @@ def setup_scheduler(bot) -> AsyncIOScheduler:
         name="Render Keep Alive Ping",
         replace_existing=True
     )
+
+    # 4. Bot ishga tushganda ham darhol tekshirish
+    try:
+        asyncio.create_task(_delayed_initial_check(bot))
+    except Exception:
+        pass
     
     return scheduler

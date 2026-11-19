@@ -1285,7 +1285,7 @@
 
     <!-- METRICS GRID -->
     <div class="stats-grid">
-      <div class="stat-card danger-card">
+      <div class="stat-card danger-card" style="cursor:pointer" onclick="showFilteredCustomersScreen('overdue')">
         <div class="stat-card-header">
           <div class="stat-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
@@ -1923,6 +1923,31 @@
       renderFilteredCustomers(query);
     }
 
+    function isCustomer3DaysOverdue(c) {
+      if ((c.overdue_debts || 0) > 0) return true;
+      if (!c.nearest_due || (c.total_debt || 0) <= 0) return false;
+      try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const due = new Date(c.nearest_due);
+        due.setHours(0, 0, 0, 0);
+        const diffDays = Math.floor((today - due) / (1000 * 60 * 60 * 24));
+        return diffDays >= 3;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function showFilteredCustomersScreen(filterType) {
+      showScreen('customers');
+      setTimeout(() => {
+        const pill = document.querySelector(`.filter-pill[onclick*="'${filterType}'"]`);
+        if (pill) {
+          setFilter(filterType, pill);
+        }
+      }, 50);
+    }
+
     function renderFilteredCustomers(searchQuery = null) {
       const container = document.getElementById('customersListContainer');
       const inp = document.getElementById('customerSearchInput');
@@ -1939,8 +1964,9 @@
         const matchesQuery = !q || c.full_name.toLowerCase().includes(q) || ((c.phone || '').includes(q));
         if (!matchesQuery) return false;
 
-        if (currentFilter === 'overdue') return (c.overdue_debts || 0) > 0;
-        if (currentFilter === 'active') return (c.total_debt || 0) > 0 && !(c.overdue_debts > 0);
+        const isOverdue = isCustomer3DaysOverdue(c);
+        if (currentFilter === 'overdue') return isOverdue;
+        if (currentFilter === 'active') return (c.total_debt || 0) > 0 && !isOverdue;
         if (currentFilter === 'paid') return (c.total_debt || 0) === 0;
         return true;
       });
@@ -1963,7 +1989,7 @@
     }
 
     function renderCustomerCardHtml(c) {
-      const hasOverdue = (c.overdue_debts || 0) > 0;
+      const hasOverdue = isCustomer3DaysOverdue(c);
       const initials = (c.full_name || 'M').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
       const hasDebt = (c.total_debt || 0) > 0;
 
@@ -2062,7 +2088,18 @@
         const initials = (data.full_name || 'M').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
         const debtsHtml = data.debts && data.debts.length ? data.debts.map(d => {
-          const isOverdue = d.status === 'overdue';
+          let isOverdue = d.status === 'overdue';
+          if (!isOverdue && d.status !== 'paid' && d.due_date) {
+            try {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const due = new Date(d.due_date);
+              due.setHours(0, 0, 0, 0);
+              if (Math.floor((today - due) / (1000 * 60 * 60 * 24)) >= 3) {
+                isOverdue = true;
+              }
+            } catch (e) {}
+          }
           const isPaid = d.status === 'paid';
           let statusBadge = isPaid 
             ? `<span class="badge badge-paid"><span class="badge-dot dot-success"></span> To'langan</span>` 

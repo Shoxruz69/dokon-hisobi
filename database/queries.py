@@ -209,8 +209,8 @@ async def get_customers_list(shop_id: str, search: Optional[str] = None,
         pass
     query = """
         SELECT c.*,
-            COUNT(CASE WHEN d.status = 'active' THEN 1 END) as active_debts,
-            COUNT(CASE WHEN d.status = 'overdue' THEN 1 END) as overdue_debts,
+            COUNT(CASE WHEN d.status = 'active' AND (d.due_date > DATE('now', '-3 days') OR d.due_date IS NULL) THEN 1 END) as active_debts,
+            COUNT(CASE WHEN d.status = 'overdue' OR (d.status = 'active' AND d.due_date <= DATE('now', '-3 days')) THEN 1 END) as overdue_debts,
             MIN(CASE WHEN d.status IN ('active', 'overdue') THEN d.due_date END) as nearest_due
         FROM customers c
         LEFT JOIN debts d ON d.customer_id = c.id
@@ -226,9 +226,9 @@ async def get_customers_list(shop_id: str, search: Optional[str] = None,
     query += " GROUP BY c.id"
 
     if status_filter == "overdue":
-        query += " HAVING COUNT(CASE WHEN d.status = 'overdue' THEN 1 END) > 0"
+        query += " HAVING (COUNT(CASE WHEN d.status = 'overdue' OR (d.status = 'active' AND d.due_date <= DATE('now', '-3 days')) THEN 1 END) > 0)"
     elif status_filter == "active":
-        query += " HAVING COUNT(CASE WHEN d.status = 'active' THEN 1 END) > 0"
+        query += " HAVING (COUNT(CASE WHEN d.status = 'active' AND (d.due_date > DATE('now', '-3 days') OR d.due_date IS NULL) THEN 1 END) > 0)"
     elif status_filter == "paid":
         query += " HAVING c.total_debt = 0"
 
@@ -454,20 +454,31 @@ async def get_customer_active_debts(customer_id: int) -> List[dict]:
 async def update_overdue_statuses() -> int:
     """To'lov muddati 3 kundan oshgan (3 kundan beri to'lamagan) qarzlarni 
     avtomatik 'overdue' holatiga o'tkazish, 3 kundan kam bo'lsa 'active' holatda saqlash"""
-    cutoff = (date.today() - timedelta(days=3)).isoformat()
     try:
-        await db_execute("""
-            UPDATE debts 
-            SET status = 'overdue', updated_at = CURRENT_TIMESTAMP
-            WHERE due_date <= ? AND status = 'active'
-        """, cutoff)
-        await db_execute("""
-            UPDATE debts 
-            SET status = 'active', updated_at = CURRENT_TIMESTAMP
-            WHERE due_date > ? AND status = 'overdue'
-        """, cutoff)
+        if is_postgres():
+            await db_execute("""
+                UPDATE debts 
+                SET status = 'overdue', updated_at = CURRENT_TIMESTAMP
+                WHERE status = 'active' AND due_date <= (CURRENT_DATE - INTERVAL '3 days')
+            """)
+            await db_execute("""
+                UPDATE debts 
+                SET status = 'active', updated_at = CURRENT_TIMESTAMP
+                WHERE status = 'overdue' AND due_date > (CURRENT_DATE - INTERVAL '3 days')
+            """)
+        else:
+            await db_execute("""
+                UPDATE debts 
+                SET status = 'overdue', updated_at = CURRENT_TIMESTAMP
+                WHERE status = 'active' AND due_date <= DATE('now', '-3 days')
+            """)
+            await db_execute("""
+                UPDATE debts 
+                SET status = 'active', updated_at = CURRENT_TIMESTAMP
+                WHERE status = 'overdue' AND due_date > DATE('now', '-3 days')
+            """)
     except Exception as e:
-        logger.warning(f"update_overdue_statuses xatosi: {e}")
+        logger.error(f"update_overdue_statuses xatosi: {e}")
     return 1
 
 async def get_debts_for_notification(days_ahead: int) -> List[dict]:
@@ -637,11 +648,11 @@ async def get_detailed_stats(shop_id: str, target_date: Optional[str] = None) ->
         db_fetch_one("""
             SELECT 
                 COUNT(DISTINCT c.id) as total_customers,
-                COUNT(DISTINCT CASE WHEN d.status = 'active' THEN d.id END) as active_debts,
-                COUNT(DISTINCT CASE WHEN d.status = 'overdue' THEN d.id END) as overdue_debts,
+                COUNT(DISTINCT CASE WHEN d.status = 'active' AND (d.due_date > DATE('now', '-3 days') OR d.due_date IS NULL) THEN d.id END) as active_debts,
+                COUNT(DISTINCT CASE WHEN d.status = 'overdue' OR (d.status = 'active' AND d.due_date <= DATE('now', '-3 days')) THEN d.id END) as overdue_debts,
                 COALESCE(SUM(CASE WHEN d.status IN ('active', 'overdue') THEN d.amount END), 0) as total_debt_sum,
                 COUNT(DISTINCT CASE WHEN d.due_date BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '7 days') 
-                           AND d.status = 'active' THEN d.id END) as due_this_week
+                           AND d.status = 'active' AND (d.due_date > DATE('now', '-3 days') OR d.due_date IS NULL) THEN d.id END) as due_this_week
             FROM customers c
             LEFT JOIN debts d ON d.customer_id = c.id
             WHERE c.shop_id = ?
