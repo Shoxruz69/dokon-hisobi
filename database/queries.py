@@ -422,7 +422,13 @@ async def get_customer_by_telegram_id(telegram_id: int) -> List[dict]:
 
 async def link_customer_telegram(phone: str, telegram_id: int) -> bool:
     """Mijozning telefon raqamiga uning Telegram ID sini bog'lash"""
-    await db_execute("UPDATE customers SET telegram_id = ? WHERE phone = ?", telegram_id, phone)
+    clean_p = str(phone).strip()
+    digits = clean_p.replace('+', '').strip()
+    await db_execute("""
+        UPDATE customers 
+        SET telegram_id = ? 
+        WHERE phone = ? OR phone = ? OR REPLACE(phone, '+', '') = ?
+    """, telegram_id, clean_p, f"+{digits}", digits)
     return True
 
 # ============================================================

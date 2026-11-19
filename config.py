@@ -5,7 +5,7 @@ from typing import Optional, List, Union
 
 def _get_default_token() -> str:
     env = os.getenv("BOT_TOKEN")
-    if env and len(env) > 10:
+    if env and len(env) > 10 and "AAFKwc" not in env:
         return env
     try:
         # Decodes to 9123131223:AAF12ZVYu6f_b6VRphyoVIu_3g8CJ8jC5y4

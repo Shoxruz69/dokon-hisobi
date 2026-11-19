@@ -216,6 +216,25 @@ async def handle_add_customer(request: web.Request):
         admin_id=admin_id,
         admin_name=admin_name_val
     )
+    # Yangi mijoz kiritilganda uning telegram_id si bo'lsa (yoki telefon orqali topilsa), SMS yuborish
+    try:
+        cust_row = await get_customer_by_id(result["customer_id"])
+        admin_row = await get_admin_by_shop_id(shop_id)
+        if cust_row:
+            await asyncio.wait_for(
+                notify_customer_debt_added(
+                    customer=cust_row,
+                    shop_name=admin_row.get("shop_name", "Do'kon") if admin_row else "Do'kon",
+                    amount=amt_val,
+                    description=description,
+                    due_date=date_val,
+                    total_debt=result["total_debt"]
+                ),
+                timeout=2.5
+            )
+    except Exception as e:
+        logger.warning(f"Yangi mijozga bildirishnoma yuborishda ogohlantirish: {e}")
+
     invalidate_api_cache()
     return web.json_response(result)
 
@@ -244,15 +263,20 @@ async def handle_mark_paid(request: web.Request):
     if not res:
         return web.json_response({"detail": "Qarz topilmadi yoki do'kon mos kelmadi"}, status=400)
 
-    # Bildirishnomani fonda yuboramiz (foydalanuvchi kutib turmaydi, tez ishlaydi)
-    import asyncio
-    asyncio.create_task(notify_customer_debt_paid(
-        customer=res["customer"],
-        shop_name=res["shop_name"],
-        debt_amount=res["paid_amount"],
-        description=res["debt"]["description"],
-        remaining_debt=res["remaining_debt"]
-    ))
+    # Bildirishnoma yuborish (mijozga Telegram SMS)
+    try:
+        await asyncio.wait_for(
+            notify_customer_debt_paid(
+                customer=res["customer"],
+                shop_name=res["shop_name"],
+                debt_amount=res["paid_amount"],
+                description=res["debt"]["description"],
+                remaining_debt=res["remaining_debt"]
+            ),
+            timeout=2.5
+        )
+    except Exception as e:
+        logger.warning(f"Qarz to'langanda bildirishnoma yuborishda ogohlantirish: {e}")
         
     invalidate_api_cache()
     return web.json_response({
@@ -296,14 +320,19 @@ async def handle_customer_pay(request: web.Request):
     except ValueError as e:
         return web.json_response({"detail": str(e)}, status=400)
 
-    # Bildirishnomani fonda yuborish
-    import asyncio
-    asyncio.create_task(notify_customer_partial_payment(
-        customer=result["customer"],
-        shop_name=result["shop_name"],
-        paid_amount=result["paid_amount"],
-        remaining_debt=result["remaining_debt"]
-    ))
+    # Bildirishnoma yuborish (mijozga Telegram SMS)
+    try:
+        await asyncio.wait_for(
+            notify_customer_partial_payment(
+                customer=result["customer"],
+                shop_name=result["shop_name"],
+                paid_amount=result["paid_amount"],
+                remaining_debt=result["remaining_debt"]
+            ),
+            timeout=2.5
+        )
+    except Exception as e:
+        logger.warning(f"To'lov bildirishnomasi yuborishda ogohlantirish: {e}")
 
     invalidate_api_cache()
     return web.json_response({
@@ -354,16 +383,21 @@ async def handle_customer_add_debt(request: web.Request):
     except ValueError as e:
         return web.json_response({"detail": str(e)}, status=400)
 
-    # Bildirishnomani fonda yuborish
-    import asyncio
-    asyncio.create_task(notify_customer_debt_added(
-        customer=result["customer"],
-        shop_name=result["shop_name"],
-        amount=result["amount"],
-        description=result["description"],
-        due_date=result["due_date"],
-        total_debt=result["total_debt"]
-    ))
+    # Bildirishnoma yuborish (mijozga Telegram SMS)
+    try:
+        await asyncio.wait_for(
+            notify_customer_debt_added(
+                customer=result["customer"],
+                shop_name=result["shop_name"],
+                amount=result["amount"],
+                description=result["description"],
+                due_date=result["due_date"],
+                total_debt=result["total_debt"]
+            ),
+            timeout=2.5
+        )
+    except Exception as e:
+        logger.warning(f"Qarz qo'shilganda bildirishnoma yuborishda ogohlantirish: {e}")
 
     invalidate_api_cache()
     return web.json_response({
