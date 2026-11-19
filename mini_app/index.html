@@ -1924,18 +1924,35 @@
     }
 
     function isCustomer3DaysOverdue(c) {
+      if (!c || (c.total_debt || 0) <= 0) return false;
+      if (c.is_overdue !== undefined && c.is_overdue !== null) {
+        return Boolean(c.is_overdue);
+      }
       if ((c.overdue_debts || 0) > 0) return true;
-      if (!c.nearest_due || (c.total_debt || 0) <= 0) return false;
+
+      // Fallback: oxirgi to'lov sanasiga qarab tekshirish
       try {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const due = new Date(c.nearest_due);
-        due.setHours(0, 0, 0, 0);
-        const diffDays = Math.floor((today - due) / (1000 * 60 * 60 * 24));
-        return diffDays >= 3;
+
+        if (c.last_payment_date) {
+          const lp = new Date(c.last_payment_date);
+          lp.setHours(0, 0, 0, 0);
+          const diffDays = Math.floor((today - lp) / (1000 * 60 * 60 * 24));
+          return diffDays >= 3;
+        }
+
+        const baseDateStr = c.first_debt_date || c.debt_date || c.created_at;
+        if (baseDateStr) {
+          const bd = new Date(baseDateStr);
+          bd.setHours(0, 0, 0, 0);
+          const diffDays = Math.floor((today - bd) / (1000 * 60 * 60 * 24));
+          return diffDays >= 3;
+        }
       } catch (e) {
         return false;
       }
+      return false;
     }
 
     function showFilteredCustomersScreen(filterType) {

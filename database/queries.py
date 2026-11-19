@@ -202,18 +202,65 @@ async def add_customer(
 
 async def get_customers_list(shop_id: str, search: Optional[str] = None, 
                              status_filter: str = "all") -> List[dict]:
-    """Do'konning barcha mijozlarini qidiruv bilan olish"""
+    """Do'konning barcha mijozlarini qidiruv bilan olish.
+    3 kundan beri to'lamaganlik qoidasi:
+    - Mijozning jami qarzi > 0 bo'lsa;
+    - Agar mijoz oxirgi 3 kunda pul to'lagan bo'lsa (bugun, kecha yoki o'tgan kun) -> Faol (3 kundan beri to'lamagan EMAS).
+    - Agar oxirgi to'lovi 3+ kun oldin bo'lsa (yoki umuman to'lamagan va qarz sanasi 3+ kun oldin bo'lsa) -> 3 kundan beri to'lamagan.
+    """
     try:
         await update_overdue_statuses()
     except Exception:
         pass
+
     query = """
-        SELECT c.*,
-            COUNT(CASE WHEN d.status = 'active' AND (d.due_date > DATE('now', '-3 days') OR d.due_date IS NULL) THEN 1 END) as active_debts,
-            COUNT(CASE WHEN d.status = 'overdue' OR (d.status = 'active' AND d.due_date <= DATE('now', '-3 days')) THEN 1 END) as overdue_debts,
-            MIN(CASE WHEN d.status IN ('active', 'overdue') THEN d.due_date END) as nearest_due
+        SELECT 
+            c.*,
+            lp.last_payment_date,
+            ds.first_debt_date,
+            ds.nearest_due,
+            COALESCE(ds.debt_count, 0) as total_active_debts,
+            CASE 
+                WHEN c.total_debt > 0 AND (
+                    (lp.last_payment_date IS NOT NULL AND DATE(lp.last_payment_date) <= DATE('now', '-3 days'))
+                    OR
+                    (lp.last_payment_date IS NULL AND ds.first_debt_date IS NOT NULL AND ds.first_debt_date <= DATE('now', '-3 days'))
+                ) THEN 1
+                ELSE 0
+            END as is_overdue,
+            CASE 
+                WHEN c.total_debt > 0 AND (
+                    (lp.last_payment_date IS NOT NULL AND DATE(lp.last_payment_date) <= DATE('now', '-3 days'))
+                    OR
+                    (lp.last_payment_date IS NULL AND ds.first_debt_date IS NOT NULL AND ds.first_debt_date <= DATE('now', '-3 days'))
+                ) THEN COALESCE(ds.debt_count, 1)
+                ELSE 0
+            END as overdue_debts,
+            CASE 
+                WHEN c.total_debt > 0 AND NOT (
+                    (lp.last_payment_date IS NOT NULL AND DATE(lp.last_payment_date) <= DATE('now', '-3 days'))
+                    OR
+                    (lp.last_payment_date IS NULL AND ds.first_debt_date IS NOT NULL AND ds.first_debt_date <= DATE('now', '-3 days'))
+                ) THEN COALESCE(ds.debt_count, 1)
+                ELSE 0
+            END as active_debts
         FROM customers c
-        LEFT JOIN debts d ON d.customer_id = c.id
+        LEFT JOIN (
+            SELECT d.customer_id, MAX(ph.paid_at) as last_payment_date
+            FROM payment_history ph
+            JOIN debts d ON d.id = ph.debt_id
+            GROUP BY d.customer_id
+        ) lp ON lp.customer_id = c.id
+        LEFT JOIN (
+            SELECT 
+                customer_id,
+                MIN(debt_date) as first_debt_date,
+                MIN(due_date) as nearest_due,
+                COUNT(id) as debt_count
+            FROM debts
+            WHERE status IN ('active', 'overdue')
+            GROUP BY customer_id
+        ) ds ON ds.customer_id = c.id
         WHERE c.shop_id = ?
     """
     params = [shop_id]
@@ -223,14 +270,20 @@ async def get_customers_list(shop_id: str, search: Optional[str] = None,
         query += " AND (c.full_name ILIKE ? OR c.phone ILIKE ?)" if is_postgres() else " AND (c.full_name LIKE ? OR c.phone LIKE ?)"
         params.extend([search_pattern, search_pattern])
 
-    query += " GROUP BY c.id"
-
     if status_filter == "overdue":
-        query += " HAVING (COUNT(CASE WHEN d.status = 'overdue' OR (d.status = 'active' AND d.due_date <= DATE('now', '-3 days')) THEN 1 END) > 0)"
+        query += """ AND c.total_debt > 0 AND (
+            (lp.last_payment_date IS NOT NULL AND DATE(lp.last_payment_date) <= DATE('now', '-3 days'))
+            OR
+            (lp.last_payment_date IS NULL AND ds.first_debt_date IS NOT NULL AND ds.first_debt_date <= DATE('now', '-3 days'))
+        )"""
     elif status_filter == "active":
-        query += " HAVING (COUNT(CASE WHEN d.status = 'active' AND (d.due_date > DATE('now', '-3 days') OR d.due_date IS NULL) THEN 1 END) > 0)"
+        query += """ AND c.total_debt > 0 AND NOT (
+            (lp.last_payment_date IS NOT NULL AND DATE(lp.last_payment_date) <= DATE('now', '-3 days'))
+            OR
+            (lp.last_payment_date IS NULL AND ds.first_debt_date IS NOT NULL AND ds.first_debt_date <= DATE('now', '-3 days'))
+        )"""
     elif status_filter == "paid":
-        query += " HAVING c.total_debt = 0"
+        query += " AND c.total_debt = 0"
 
     query += " ORDER BY c.id DESC"
 
@@ -452,30 +505,78 @@ async def get_customer_active_debts(customer_id: int) -> List[dict]:
     """, customer_id)
 
 async def update_overdue_statuses() -> int:
-    """To'lov muddati 3 kundan oshgan (3 kundan beri to'lamagan) qarzlarni 
-    avtomatik 'overdue' holatiga o'tkazish, 3 kundan kam bo'lsa 'active' holatda saqlash"""
+    """3 kundan beri to'lamagan mijozlarning faol qarzlarini 'overdue' ga o'tkazish,
+    oxirgi 3 kunda pul to'lagan mijozlarning qarzlarini esa 'active' holatga qaytarish"""
     try:
         if is_postgres():
-            await db_execute("""
-                UPDATE debts 
-                SET status = 'overdue', updated_at = CURRENT_TIMESTAMP
-                WHERE status = 'active' AND due_date <= (CURRENT_DATE - INTERVAL '3 days')
-            """)
+            # 1. Oxirgi 3 kunda pul to'lagan mijozlarning qarzlarini 'active' ga qaytarish
             await db_execute("""
                 UPDATE debts 
                 SET status = 'active', updated_at = CURRENT_TIMESTAMP
-                WHERE status = 'overdue' AND due_date > (CURRENT_DATE - INTERVAL '3 days')
+                WHERE status = 'overdue'
+                  AND customer_id IN (
+                      SELECT d2.customer_id
+                      FROM payment_history ph
+                      JOIN debts d2 ON d2.id = ph.debt_id
+                      WHERE DATE(ph.paid_at) > (CURRENT_DATE - INTERVAL '3 days')
+                  )
+            """)
+            # 2. 3 kundan beri to'lamagan mijozlarning qarzlarini 'overdue' qilish
+            await db_execute("""
+                UPDATE debts 
+                SET status = 'overdue', updated_at = CURRENT_TIMESTAMP
+                WHERE status = 'active'
+                  AND (
+                      customer_id IN (
+                          SELECT d2.customer_id
+                          FROM payment_history ph
+                          JOIN debts d2 ON d2.id = ph.debt_id
+                          GROUP BY d2.customer_id
+                          HAVING DATE(MAX(ph.paid_at)) <= (CURRENT_DATE - INTERVAL '3 days')
+                      )
+                      OR (
+                          customer_id NOT IN (
+                              SELECT DISTINCT d3.customer_id
+                              FROM payment_history ph2
+                              JOIN debts d3 ON d3.id = ph2.debt_id
+                          )
+                          AND debt_date <= (CURRENT_DATE - INTERVAL '3 days')
+                      )
+                  )
             """)
         else:
             await db_execute("""
                 UPDATE debts 
-                SET status = 'overdue', updated_at = CURRENT_TIMESTAMP
-                WHERE status = 'active' AND due_date <= DATE('now', '-3 days')
+                SET status = 'active', updated_at = CURRENT_TIMESTAMP
+                WHERE status = 'overdue'
+                  AND customer_id IN (
+                      SELECT d2.customer_id
+                      FROM payment_history ph
+                      JOIN debts d2 ON d2.id = ph.debt_id
+                      WHERE DATE(ph.paid_at) > DATE('now', '-3 days')
+                  )
             """)
             await db_execute("""
                 UPDATE debts 
-                SET status = 'active', updated_at = CURRENT_TIMESTAMP
-                WHERE status = 'overdue' AND due_date > DATE('now', '-3 days')
+                SET status = 'overdue', updated_at = CURRENT_TIMESTAMP
+                WHERE status = 'active'
+                  AND (
+                      customer_id IN (
+                          SELECT d2.customer_id
+                          FROM payment_history ph
+                          JOIN debts d2 ON d2.id = ph.debt_id
+                          GROUP BY d2.customer_id
+                          HAVING DATE(MAX(ph.paid_at)) <= DATE('now', '-3 days')
+                      )
+                      OR (
+                          customer_id NOT IN (
+                              SELECT DISTINCT d3.customer_id
+                              FROM payment_history ph2
+                              JOIN debts d3 ON d3.id = ph2.debt_id
+                          )
+                          AND debt_date <= DATE('now', '-3 days')
+                      )
+                  )
             """)
     except Exception as e:
         logger.error(f"update_overdue_statuses xatosi: {e}")
@@ -529,10 +630,17 @@ async def get_all_customers_with_active_debts() -> List[dict]:
             d.description as debt_description,
             d.due_date,
             d.status as debt_status,
-            d.debt_date
+            d.debt_date,
+            lp.last_payment_date
         FROM customers c
         JOIN debts d ON d.customer_id = c.id AND d.status IN ('active', 'overdue')
         LEFT JOIN admins a ON a.shop_id = c.shop_id
+        LEFT JOIN (
+            SELECT d2.customer_id, MAX(ph.paid_at) as last_payment_date
+            FROM payment_history ph
+            JOIN debts d2 ON d2.id = ph.debt_id
+            GROUP BY d2.customer_id
+        ) lp ON lp.customer_id = c.id
         ORDER BY c.id, d.due_date ASC
     """)
     
@@ -549,6 +657,7 @@ async def get_all_customers_with_active_debts() -> List[dict]:
                 "shop_id": r["shop_id"],
                 "shop_name": r["shop_name"] or "Do'kon",
                 "admin_phone": r["admin_phone"],
+                "last_payment_date": r.get("last_payment_date"),
                 "debts": []
             }
         customers_map[cid]["debts"].append({
@@ -647,14 +756,37 @@ async def get_detailed_stats(shop_id: str, target_date: Optional[str] = None) ->
         # 5. Umumiy ko'rsatkichlar
         db_fetch_one("""
             SELECT 
-                COUNT(DISTINCT c.id) as total_customers,
-                COUNT(DISTINCT CASE WHEN d.status = 'active' AND (d.due_date > DATE('now', '-3 days') OR d.due_date IS NULL) THEN d.id END) as active_debts,
-                COUNT(DISTINCT CASE WHEN d.status = 'overdue' OR (d.status = 'active' AND d.due_date <= DATE('now', '-3 days')) THEN d.id END) as overdue_debts,
-                COALESCE(SUM(CASE WHEN d.status IN ('active', 'overdue') THEN d.amount END), 0) as total_debt_sum,
-                COUNT(DISTINCT CASE WHEN d.due_date BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '7 days') 
-                           AND d.status = 'active' AND (d.due_date > DATE('now', '-3 days') OR d.due_date IS NULL) THEN d.id END) as due_this_week
+                COUNT(c.id) as total_customers,
+                COALESCE(SUM(CASE WHEN c.total_debt > 0 THEN c.total_debt ELSE 0 END), 0) as total_debt_sum,
+                COUNT(CASE WHEN c.total_debt > 0 AND (
+                    (lp.last_payment_date IS NOT NULL AND DATE(lp.last_payment_date) <= DATE('now', '-3 days'))
+                    OR
+                    (lp.last_payment_date IS NULL AND ds.first_debt_date IS NOT NULL AND ds.first_debt_date <= DATE('now', '-3 days'))
+                ) THEN 1 END) as overdue_debts,
+                COUNT(CASE WHEN c.total_debt > 0 AND NOT (
+                    (lp.last_payment_date IS NOT NULL AND DATE(lp.last_payment_date) <= DATE('now', '-3 days'))
+                    OR
+                    (lp.last_payment_date IS NULL AND ds.first_debt_date IS NOT NULL AND ds.first_debt_date <= DATE('now', '-3 days'))
+                ) THEN 1 END) as active_debts,
+                COUNT(CASE WHEN ds.nearest_due BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '7 days') 
+                           AND c.total_debt > 0 THEN 1 END) as due_this_week
             FROM customers c
-            LEFT JOIN debts d ON d.customer_id = c.id
+            LEFT JOIN (
+                SELECT d2.customer_id, MAX(ph.paid_at) as last_payment_date
+                FROM payment_history ph
+                JOIN debts d2 ON d2.id = ph.debt_id
+                GROUP BY d2.customer_id
+            ) lp ON lp.customer_id = c.id
+            LEFT JOIN (
+                SELECT 
+                    customer_id,
+                    MIN(debt_date) as first_debt_date,
+                    MIN(due_date) as nearest_due,
+                    COUNT(id) as debt_count
+                FROM debts
+                WHERE status IN ('active', 'overdue')
+                GROUP BY customer_id
+            ) ds ON ds.customer_id = c.id
             WHERE c.shop_id = ?
         """, shop_id),
         # 6. Do'kon ma'lumotlari

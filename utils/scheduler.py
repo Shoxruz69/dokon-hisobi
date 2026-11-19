@@ -280,42 +280,50 @@ async def send_reminders(bot, manual_admin_id: Optional[int] = None) -> dict:
         shops_data[shop_id]["total_debt"] += c_debt
         shops_data[shop_id]["customers"].append(cust)
         
-        # 3 kundan beri to'lanmaganligini aniqlash
-        overdue_debts = []
-        max_days_overdue = 0
-        for d in cust.get("debts", []):
-            d_date = d.get("due_date")
-            if isinstance(d_date, str):
+        # 3 kundan beri to'lamaganlikni hisoblash (Mijozning oxirgi to'lov sanasiga asosan):
+        # Agar mijoz oxirgi 3 kunda pul to'lagan bo'lsa (bugun, kecha, o'tgan kun),
+        # u faol to'lovchi hisoblanadi va 3 kundan beri to'lamaganlarga TUSHMASLIGI kerak!
+        last_pay = cust.get("last_payment_date")
+        days_without_payment = None
+
+        if last_pay:
+            try:
+                lp_dt = datetime.fromisoformat(str(last_pay).replace("Z", "+00:00")).date()
+            except Exception:
                 try:
-                    due_dt = datetime.strptime(d_date[:10], "%Y-%m-%d").date()
+                    lp_dt = date.fromisoformat(str(last_pay)[:10])
                 except Exception:
-                    due_dt = today_dt
-            elif isinstance(d_date, datetime):
-                due_dt = d_date.date()
-            elif isinstance(d_date, date):
-                due_dt = d_date
+                    lp_dt = None
+            if lp_dt:
+                days_without_payment = (today_dt - lp_dt).days
+
+        if days_without_payment is None:
+            # Umuman to'lov qilmagan bo'lsa, birinchi qarz sanasidan boshlab hisoblanadi
+            earliest_debt_date = None
+            for d in cust.get("debts", []):
+                dd = d.get("debt_date") or d.get("created_at") or d.get("due_date")
+                if dd:
+                    try:
+                        parsed_dd = date.fromisoformat(str(dd)[:10])
+                        if earliest_debt_date is None or parsed_dd < earliest_debt_date:
+                            earliest_debt_date = parsed_dd
+                    except Exception:
+                        pass
+            if earliest_debt_date:
+                days_without_payment = (today_dt - earliest_debt_date).days
             else:
-                due_dt = today_dt
-                
-            days_diff = (today_dt - due_dt).days
-            if days_diff >= 3 or d.get("status") == "overdue":
-                d["days_overdue"] = max(days_diff, 3)
-                overdue_debts.append(d)
-                if d["days_overdue"] > max_days_overdue:
-                    max_days_overdue = d["days_overdue"]
-            else:
-                d["days_overdue"] = max(days_diff, 0)
-                
-        is_3days = (len(overdue_debts) > 0)
+                days_without_payment = 0
+
+        is_3days = (days_without_payment is not None and days_without_payment >= 3 and c_debt > 0)
         cust["is_3days_overdue"] = is_3days
-        cust["max_days_overdue"] = max_days_overdue
-        
+        cust["max_days_overdue"] = max(days_without_payment, 0) if days_without_payment is not None else 0
+
         if is_3days:
             shops_data[shop_id]["overdue_3days"].append({
                 "name": c_name,
                 "phone": c_phone,
                 "debt": c_debt,
-                "days_overdue": max_days_overdue,
+                "days_overdue": cust["max_days_overdue"],
                 "customer_id": cust["customer_id"],
                 "telegram_id": tg_id,
                 "cust_obj": cust
