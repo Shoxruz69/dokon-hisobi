@@ -230,7 +230,7 @@ async def handle_add_customer(request: web.Request):
                     due_date=date_val,
                     total_debt=result["total_debt"]
                 ),
-                timeout=2.5
+                timeout=5.0
             )
     except Exception as e:
         logger.warning(f"Yangi mijozga bildirishnoma yuborishda ogohlantirish: {e}")
@@ -273,7 +273,7 @@ async def handle_mark_paid(request: web.Request):
                 description=res["debt"]["description"],
                 remaining_debt=res["remaining_debt"]
             ),
-            timeout=2.5
+            timeout=5.0
         )
     except Exception as e:
         logger.warning(f"Qarz to'langanda bildirishnoma yuborishda ogohlantirish: {e}")
@@ -329,7 +329,7 @@ async def handle_customer_pay(request: web.Request):
                 paid_amount=result["paid_amount"],
                 remaining_debt=result["remaining_debt"]
             ),
-            timeout=2.5
+            timeout=5.0
         )
     except Exception as e:
         logger.warning(f"To'lov bildirishnomasi yuborishda ogohlantirish: {e}")
@@ -394,7 +394,7 @@ async def handle_customer_add_debt(request: web.Request):
                 due_date=result["due_date"],
                 total_debt=result["total_debt"]
             ),
-            timeout=2.5
+            timeout=5.0
         )
     except Exception as e:
         logger.warning(f"Qarz qo'shilganda bildirishnoma yuborishda ogohlantirish: {e}")
