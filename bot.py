@@ -42,7 +42,7 @@ async def setup_bot_commands(bot: Bot):
             await bot.set_chat_menu_button(
                 menu_button=MenuButtonWebApp(
                     text="📱 Mini App",
-                    web_app=WebAppInfo(url=f"{mini_app_url}?v=2.5")
+                    web_app=WebAppInfo(url=f"{mini_app_url}?v=2.6")
                 )
             )
         logger.info("✅ Bot komandalari va Menu tugmasi muvaffaqiyatli o'rnatildi")

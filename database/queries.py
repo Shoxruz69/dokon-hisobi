@@ -721,8 +721,8 @@ async def get_detailed_stats(shop_id: str, target_date: Optional[str] = None) ->
     ) = await asyncio.gather(
         # 1. Tanlangan kungi berilgan qarzlar ro'yxati
         db_fetch_all("""
-            SELECT d.id, d.customer_id, d.amount, d.description, d.due_date, d.created_at,
-                   d.created_by_admin_id, d.created_by_admin_name,
+            SELECT d.id, d.customer_id, d.amount, d.description, d.due_date, d.debt_date, d.created_at,
+                   d.created_by_admin_id, COALESCE(d.created_by_admin_name, 'Admin') as admin_name,
                    c.full_name as customer_name, c.phone as customer_phone
             FROM debts d
             JOIN customers c ON c.id = d.customer_id
@@ -731,7 +731,8 @@ async def get_detailed_stats(shop_id: str, target_date: Optional[str] = None) ->
         """, shop_id, t_date),
         # 2. Tanlangan kungi undirilgan to'lovlar ro'yxati
         db_fetch_all("""
-            SELECT ph.id, ph.debt_id, ph.amount, ph.paid_at, ph.note, ph.admin_id, ph.admin_name,
+            SELECT ph.id, ph.debt_id, ph.amount, ph.paid_at, ph.note, ph.admin_id,
+                   COALESCE(ph.admin_name, 'Admin') as admin_name,
                    d.customer_id, d.description as debt_description,
                    c.full_name as customer_name, c.phone as customer_phone
             FROM payment_history ph

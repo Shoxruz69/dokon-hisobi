@@ -528,8 +528,9 @@
     .customer-meta {
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-size: 12px;
+      flex-wrap: wrap;
+      gap: 4px 6px;
+      font-size: 11.5px;
       color: var(--text-muted);
       margin-top: 3px;
     }
@@ -563,17 +564,21 @@
     .badge {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      padding: 3px 8px;
+      gap: 4px;
+      padding: 2px 7px;
       border-radius: var(--radius-full);
-      font-size: 11px;
+      font-size: 10.5px;
       font-weight: 700;
+      white-space: nowrap;
+      flex-shrink: 0;
+      line-height: 1.2;
     }
 
     .badge-dot {
       width: 6px;
       height: 6px;
       border-radius: 50%;
+      flex-shrink: 0;
     }
 
     .dot-danger { background: var(--danger); }
@@ -583,6 +588,9 @@
     .badge-overdue {
       background: var(--danger-light);
       color: var(--danger);
+      white-space: nowrap;
+      font-size: 10px;
+      padding: 2px 6px;
     }
 
     .badge-active {
@@ -1293,11 +1301,11 @@
             </svg>
           </div>
           <span class="badge badge-overdue">
-            <span class="badge-dot dot-danger"></span> 3 kundan beri to'lamagan
+            <span class="badge-dot dot-danger"></span> 3+ kun to'lamagan
           </span>
         </div>
         <div class="stat-value" id="stat-overdue">0 ta</div>
-        <div class="stat-label">3 kundan beri to'lamagan</div>
+        <div class="stat-label">3+ kun to'lamagan</div>
       </div>
 
       <div class="stat-card">
@@ -1378,7 +1386,7 @@
     <div class="filter-pills">
       <button class="filter-pill active" onclick="setFilter('all', this)">Barchasi</button>
       <button class="filter-pill" onclick="setFilter('overdue', this)">
-        <span class="badge-dot dot-danger"></span> 3 kundan beri to'lamagan
+        <span class="badge-dot dot-danger"></span> 3+ kun to'lamagan
       </button>
       <button class="filter-pill" onclick="setFilter('active', this)">
         <span class="badge-dot dot-warning"></span> Faol
@@ -2011,7 +2019,7 @@
       const hasDebt = (c.total_debt || 0) > 0;
 
       let badge = hasOverdue 
-        ? `<span class="badge badge-overdue"><span class="badge-dot dot-danger"></span> 3 kundan beri to'lamagan</span>` 
+        ? `<span class="badge badge-overdue"><span class="badge-dot dot-danger"></span> 3+ kun to'lamagan</span>` 
         : hasDebt 
           ? `<span class="badge badge-active"><span class="badge-dot dot-warning"></span> Faol</span>` 
           : `<span class="badge badge-paid"><span class="badge-dot dot-success"></span> Qarz yo'q</span>`;
@@ -2022,7 +2030,8 @@
           <div class="customer-info">
             <div class="customer-name">${escHtml(c.full_name)}</div>
             <div class="customer-meta">
-              <span>${escHtml(c.phone || 'Raqam yo\'q')}</span> • ${badge}
+              <span>${escHtml(c.phone || 'Raqam yo\'q')}</span>
+              ${badge}
             </div>
           </div>
           <div class="customer-right">
@@ -2121,7 +2130,7 @@
           let statusBadge = isPaid 
             ? `<span class="badge badge-paid"><span class="badge-dot dot-success"></span> To'langan</span>` 
             : isOverdue 
-              ? `<span class="badge badge-overdue"><span class="badge-dot dot-danger"></span> 3 kundan beri to'lamagan</span>` 
+              ? `<span class="badge badge-overdue"><span class="badge-dot dot-danger"></span> 3+ kun to'lamagan</span>` 
               : `<span class="badge badge-active"><span class="badge-dot dot-warning"></span> Faol</span>`;
 
           const adminTag = (d.created_by_admin_name || d.created_by_admin_id) ? `
@@ -3217,6 +3226,21 @@
                 <span class="tx-badge-given">Qarz berildi</span>
               </div>
               ${item.description ? `<div class="debt-row"><span>Tavsif:</span><b>${escHtml(item.description)}</b></div>` : ''}
+              <div class="debt-row" style="margin-top:3px">
+                <span style="color:var(--text-muted);display:flex;align-items:center;gap:4px">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  Berilgan vaqti:
+                </span>
+                <b>${formatDateTimeUz(item.created_at || item.debt_date)}</b>
+              </div>
+              ${item.due_date ? `
+              <div class="debt-row">
+                <span style="color:var(--text-muted);display:flex;align-items:center;gap:4px">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  To'lov muddati:
+                </span>
+                <b>${formatDateLong(item.due_date)}</b>
+              </div>` : ''}
               <div class="debt-admin-tag">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 <span>Qo'shgan admin: <b>${escHtml(item.admin_name || 'Admin')}</b></span>
@@ -3242,6 +3266,13 @@
                 <span class="tx-badge-paid">To'lov</span>
               </div>
               ${item.note ? `<div class="debt-row"><span>Izoh:</span><b>${escHtml(item.note)}</b></div>` : ''}
+              <div class="debt-row" style="margin-top:3px">
+                <span style="color:var(--text-muted);display:flex;align-items:center;gap:4px">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  To'langan vaqti:
+                </span>
+                <b>${formatDateTimeUz(item.paid_at)}</b>
+              </div>
               <div class="debt-admin-tag" style="background:#e0f2fe;color:#0369a1;border-color:#bae6fd">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 <span>Qabul qilgan: <b>${escHtml(item.admin_name || 'Admin')}</b></span>
@@ -3306,7 +3337,7 @@
             </div>
             <div class="stat-card danger-card">
               <div class="stat-value">${overall.overdue_debts || 0} ta</div>
-              <div class="stat-label">3 kundan beri to'lamagan</div>
+              <div class="stat-label">3+ kun to'lamagan</div>
             </div>
             <div class="stat-card">
               <div class="stat-value">${overall.active_debts || 0} ta</div>
@@ -3356,11 +3387,14 @@
           const parts = dateStr.split('-');
           return `${parseInt(parts[2], 10)}-${months[parseInt(parts[1], 10) - 1]} ${parts[0]}`;
         }
-        if (!dateStr.includes('Z') && !dateStr.includes('+') && dateStr.includes(' ')) {
-          dateStr = dateStr.replace(' ', 'T') + 'Z';
+        if (!dateStr.includes('T') && dateStr.includes(' ')) {
+          dateStr = dateStr.replace(' ', 'T');
+        }
+        if (!dateStr.includes('Z') && !dateStr.includes('+')) {
+          dateStr = dateStr + 'Z';
         }
         const d = new Date(dateStr);
-        if (isNaN(d.getTime())) return String(s);
+        if (isNaN(d.getTime())) return formatDateLong(s);
 
         const formatter = new Intl.DateTimeFormat('en-GB', {
           timeZone: 'Asia/Tashkent',
@@ -3436,7 +3470,7 @@
                 </div>
                 <span class="badge ${isOverdue ? 'badge-overdue' : 'badge-active'}">
                   <span class="badge-dot ${isOverdue ? 'dot-danger' : 'dot-warning'}"></span>
-                  ${isOverdue ? "3 kundan beri to'lamagan" : "To'lanishi kerak"}
+                  ${isOverdue ? "3+ kun to'lamagan" : "To'lanishi kerak"}
                 </span>
               </div>
               <div class="debt-row">
