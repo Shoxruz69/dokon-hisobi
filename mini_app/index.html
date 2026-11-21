@@ -1938,23 +1938,31 @@
       }
       if ((c.overdue_debts || 0) > 0) return true;
 
-      // Fallback: oxirgi to'lov sanasiga qarab tekshirish
+      // Fallback: oxirgi faollik sanasiga qarab tekshirish (to'lov yoki yangi qarz)
       try {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
+        let lastAct = null;
         if (c.last_payment_date) {
           const lp = new Date(c.last_payment_date);
           lp.setHours(0, 0, 0, 0);
-          const diffDays = Math.floor((today - lp) / (1000 * 60 * 60 * 24));
-          return diffDays >= 3;
+          if (!isNaN(lp.getTime())) lastAct = lp;
         }
 
-        const baseDateStr = c.first_debt_date || c.debt_date || c.created_at;
-        if (baseDateStr) {
-          const bd = new Date(baseDateStr);
-          bd.setHours(0, 0, 0, 0);
-          const diffDays = Math.floor((today - bd) / (1000 * 60 * 60 * 24));
+        const debtDateStr = c.last_debt_date || c.debt_date || c.created_at;
+        if (debtDateStr) {
+          const ld = new Date(debtDateStr);
+          ld.setHours(0, 0, 0, 0);
+          if (!isNaN(ld.getTime())) {
+            if (!lastAct || ld > lastAct) {
+              lastAct = ld;
+            }
+          }
+        }
+
+        if (lastAct) {
+          const diffDays = Math.floor((today - lastAct) / (1000 * 60 * 60 * 24));
           return diffDays >= 3;
         }
       } catch (e) {
@@ -2533,14 +2541,22 @@
         document.getElementById('modalAddDebt').classList.remove('show');
         showToast(`${formatMoney(amountVal)} qarz qo'shildi! Jami: ${formatMoney(res.total_debt)}`, 'success');
 
-        // Optimistik tezkor yangilash (0 ms)
+        // Optimistik tezkor yangilash (0 ms) — yangi qarz olingani sababli mijoz faol holatga o'tadi
         if (allCustomers && allCustomers.length) {
           const c = allCustomers.find(item => item.id === activeCustomerId);
-          if (c) c.total_debt = res.total_debt;
+          if (c) {
+            c.total_debt = res.total_debt;
+            c.is_overdue = 0;
+            c.overdue_debts = 0;
+            c.last_debt_date = new Date().toISOString().split('T')[0];
+          }
           setLocalCache('dh_customers', allCustomers);
         }
         if (currentCustomerDetail && currentCustomerDetail.id === activeCustomerId) {
           currentCustomerDetail.total_debt = res.total_debt;
+          currentCustomerDetail.is_overdue = 0;
+          currentCustomerDetail.overdue_debts = 0;
+          currentCustomerDetail.last_debt_date = new Date().toISOString().split('T')[0];
         }
 
         cachedStats = null;
