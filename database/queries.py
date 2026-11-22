@@ -1,8 +1,12 @@
 import uuid
 import logging
 import asyncio
-from datetime import date, datetime, timedelta
-from zoneinfo import ZoneInfo
+from datetime import date, datetime, timedelta, timezone
+try:
+    from zoneinfo import ZoneInfo
+    UZ_TZ = UZ_TZ
+except Exception:
+    UZ_TZ = timezone(timedelta(hours=5))
 from typing import Optional, List, Dict, Any
 
 from database.db import (
@@ -182,7 +186,7 @@ async def add_customer(
             await db_execute("UPDATE customers SET total_debt = ? WHERE id = ?", new_total, customer_id)
 
     # 2. Qarzni kiritish (qaysi admin qo'shgani bilan va O'zbekiston/Farg'ona vaqti bilan)
-    now_dt = datetime.now(ZoneInfo("Asia/Tashkent"))
+    now_dt = datetime.now(UZ_TZ)
     # Yangi qarz olinganligi sababli mijozning eski 'overdue' holatidagi qarzlarini 'active' ga o'tkazish
     await db_execute("UPDATE debts SET status = 'active', updated_at = ? WHERE customer_id = ? AND status = 'overdue'", now_dt, customer_id)
     debt_id = await db_execute_insert("""
@@ -217,28 +221,29 @@ async def get_customers_list(shop_id: str, search: Optional[str] = None,
 
     query = """
         SELECT 
-            c.*,
+            c.id, c.shop_id, c.full_name, c.phone, c.telegram_id, c.notes, c.created_at,
+            COALESCE(ds.real_total_debt, 0) as total_debt,
             lp.last_payment_date,
             ds.first_debt_date,
             ds.last_debt_date,
             ds.nearest_due,
             COALESCE(ds.debt_count, 0) as total_active_debts,
             CASE 
-                WHEN c.total_debt > 0 
+                WHEN COALESCE(ds.real_total_debt, 0) > 0 
                      AND (lp.last_payment_date IS NULL OR DATE(lp.last_payment_date) <= DATE('now', '-3 days'))
                      AND (ds.last_debt_date IS NULL OR ds.last_debt_date <= DATE('now', '-3 days'))
                 THEN 1
                 ELSE 0
             END as is_overdue,
             CASE 
-                WHEN c.total_debt > 0 
+                WHEN COALESCE(ds.real_total_debt, 0) > 0 
                      AND (lp.last_payment_date IS NULL OR DATE(lp.last_payment_date) <= DATE('now', '-3 days'))
                      AND (ds.last_debt_date IS NULL OR ds.last_debt_date <= DATE('now', '-3 days'))
                 THEN COALESCE(ds.debt_count, 1)
                 ELSE 0
             END as overdue_debts,
             CASE 
-                WHEN c.total_debt > 0 
+                WHEN COALESCE(ds.real_total_debt, 0) > 0 
                      AND NOT (
                          (lp.last_payment_date IS NULL OR DATE(lp.last_payment_date) <= DATE('now', '-3 days'))
                          AND (ds.last_debt_date IS NULL OR ds.last_debt_date <= DATE('now', '-3 days'))
@@ -259,7 +264,8 @@ async def get_customers_list(shop_id: str, search: Optional[str] = None,
                 MIN(debt_date) as first_debt_date,
                 MAX(debt_date) as last_debt_date,
                 MIN(due_date) as nearest_due,
-                COUNT(id) as debt_count
+                COUNT(id) as debt_count,
+                COALESCE(SUM(amount), 0) as real_total_debt
             FROM debts
             WHERE status IN ('active', 'overdue')
             GROUP BY customer_id
@@ -274,19 +280,19 @@ async def get_customers_list(shop_id: str, search: Optional[str] = None,
         params.extend([search_pattern, search_pattern])
 
     if status_filter == "overdue":
-        query += """ AND c.total_debt > 0 
+        query += """ AND COALESCE(ds.real_total_debt, 0) > 0 
             AND (lp.last_payment_date IS NULL OR DATE(lp.last_payment_date) <= DATE('now', '-3 days'))
             AND (ds.last_debt_date IS NULL OR ds.last_debt_date <= DATE('now', '-3 days'))
         """
     elif status_filter == "active":
-        query += """ AND c.total_debt > 0 
+        query += """ AND COALESCE(ds.real_total_debt, 0) > 0 
             AND NOT (
                 (lp.last_payment_date IS NULL OR DATE(lp.last_payment_date) <= DATE('now', '-3 days'))
                 AND (ds.last_debt_date IS NULL OR ds.last_debt_date <= DATE('now', '-3 days'))
             )
         """
     elif status_filter == "paid":
-        query += " AND c.total_debt = 0"
+        query += " AND COALESCE(ds.real_total_debt, 0) = 0"
 
     query += " ORDER BY c.id DESC"
 
@@ -317,8 +323,18 @@ async def get_customer_detail(customer_id: int, shop_id: Optional[str] = None) -
     cust_dict["debts"] = debts
     cust_dict["payments"] = payments
 
+    # Haqiqiy faol qarzlar yig'indisini aniqlash va customers jadvali bilan doimo sinxron saqlash
+    active_sum = round(sum(
+        float(d.get("amount") or 0) 
+        for d in debts 
+        if d.get("status") in ("active", "overdue")
+    ), 2)
+    if round(float(cust_dict.get("total_debt") or 0.0), 2) != active_sum:
+        await db_execute("UPDATE customers SET total_debt = ? WHERE id = ?", active_sum, customer_id)
+        cust_dict["total_debt"] = active_sum
+
     # Bugungi hisob-kitob (O'zbekiston / Toshkent vaqti bo'yicha)
-    today_uz = datetime.now(ZoneInfo("Asia/Tashkent")).date().isoformat()
+    today_uz = datetime.now(UZ_TZ).date().isoformat()
     today_borrowed = sum(
         float(d.get("amount") or 0) 
         for d in debts 
@@ -452,7 +468,7 @@ async def mark_debt_paid(debt_id: int, shop_id: Optional[str] = None,
 
     customer_id = debt["customer_id"]
     amount = float(debt["amount"])
-    now_dt = datetime.now(ZoneInfo("Asia/Tashkent"))
+    now_dt = datetime.now(UZ_TZ)
     resolved_name = resolve_admin_label(admin_id, admin_name)
 
     # 1. Qarzni paid ga o'tkazish
@@ -911,7 +927,7 @@ async def record_customer_payment(
 
     actual_pay = min(pay_amount, total_debt)
     remaining_to_deduct = actual_pay
-    now_dt = datetime.now(ZoneInfo("Asia/Tashkent"))
+    now_dt = datetime.now(UZ_TZ)
     default_note = note or "Qisman to'lov"
     resolved_name = resolve_admin_label(admin_id, admin_name)
 
@@ -921,7 +937,16 @@ async def record_customer_payment(
         ORDER BY debt_date ASC, id ASC
     """, customer_id, shop_id)
 
+    # 1. Aniq summa mos keladigan qarzni qidirish (masalan: 12 000 so'm to'langanda aynan 12 000 lik qarzni birinchi yopish)
+    exact_match = None
     for d in active_debts:
+        if abs(float(d["amount"]) - remaining_to_deduct) < 0.01:
+            exact_match = d
+            break
+
+    debts_to_process = ([exact_match] + [d for d in active_debts if d["id"] != exact_match["id"]]) if exact_match else active_debts
+
+    for d in debts_to_process:
         if remaining_to_deduct <= 0:
             break
             
@@ -957,9 +982,14 @@ async def record_customer_payment(
             remaining_to_deduct = 0
             break
 
-    new_total = max(0.0, round(total_debt - actual_pay, 2))
+    # Mijozning jami qarzini bevosita bazadagi faol qarzlar yig'indisi bilan 100% kafolatli yangilash
+    tot_row = await db_fetch_one(
+        "SELECT COALESCE(SUM(amount), 0) as total FROM debts WHERE customer_id = ? AND status IN ('active', 'overdue')",
+        customer_id
+    )
+    new_total = float(tot_row["total"]) if tot_row else 0.0
     await db_execute("UPDATE customers SET total_debt = ? WHERE id = ?", new_total, customer_id)
-    # Yangi qarz olinganligi sababli mijozning eski 'overdue' holatidagi qarzlarini 'active' ga o'tkazish
+    # Yangi to'lov/harakat bo'lganligi sababli mijozning eski 'overdue' holatidagi qarzlarini 'active' ga o'tkazish
     await db_execute("UPDATE debts SET status = 'active', updated_at = ? WHERE customer_id = ? AND status = 'overdue'", now_dt, customer_id)
 
     admin = await get_admin_by_shop_id(shop_id)
@@ -992,13 +1022,18 @@ async def add_debt_to_existing_customer(
     resolved_name = resolve_admin_label(admin_id, admin_name)
     desc_val = description.strip() if description and str(description).strip() else "Nasiya savdo"
 
-    now_dt = datetime.now(ZoneInfo("Asia/Tashkent"))
-    new_total = round(float(cust.get("total_debt") or 0.0) + float(amount), 2)
+    now_dt = datetime.now(UZ_TZ)
     debt_id = await db_execute_insert("""
         INSERT INTO debts (customer_id, shop_id, amount, description, debt_date, due_date, status, admin_note, created_by_admin_id, created_by_admin_name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)
     """, customer_id, shop_id, float(amount), desc_val, d_date, d_due, notes, admin_id, resolved_name, now_dt, now_dt)
 
+    # Yangi qarz qo'shilgandan so'ng mijozning jami qarzini barcha faol qarzlar summasiga aniq tenglash
+    tot_row = await db_fetch_one(
+        "SELECT COALESCE(SUM(amount), 0) as total FROM debts WHERE customer_id = ? AND status IN ('active', 'overdue')",
+        customer_id
+    )
+    new_total = float(tot_row["total"]) if tot_row else float(amount)
     await db_execute("UPDATE customers SET total_debt = ? WHERE id = ?", new_total, customer_id)
     # Yangi qarz olinganligi sababli mijozning eski 'overdue' holatidagi qarzlarini 'active' ga o'tkazish
     await db_execute("UPDATE debts SET status = 'active', updated_at = ? WHERE customer_id = ? AND status = 'overdue'", now_dt, customer_id)

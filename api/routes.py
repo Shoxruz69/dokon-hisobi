@@ -47,6 +47,10 @@ async def cors_middleware(request: web.Request, handler):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Shop-Id, X-Telegram-User-Id, X-Telegram-Init-Data"
+    if request.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
     return response
 
 # ============================================================
@@ -617,7 +621,7 @@ async def handle_favicon(request: web.Request):
 
 async def handle_health(request: web.Request):
     """Render va server salomatligini tekshirish uchun endpoint"""
-    return web.json_response({"status": "ok", "app": "dokon-hisobi", "version": "2.7"})
+    return web.json_response({"status": "ok", "app": "dokon-hisobi", "version": "2.8"})
 
 def create_web_app() -> web.Application:
     """Aiohttp veb ilovasini yaratish"""

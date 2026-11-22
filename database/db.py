@@ -4,7 +4,10 @@ import logging
 import asyncio
 from pathlib import Path
 from typing import Optional, List, Dict, Any
-import aiosqlite
+try:
+    import aiosqlite
+except ImportError:
+    aiosqlite = None
 import asyncpg
 from config import settings
 

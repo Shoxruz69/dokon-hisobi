@@ -1,8 +1,12 @@
 import os
 import logging
 import asyncio
-from datetime import datetime, date
-from zoneinfo import ZoneInfo
+from datetime import datetime, date, timedelta, timezone
+try:
+    from zoneinfo import ZoneInfo
+    UZ_TZ = UZ_TZ
+except Exception:
+    UZ_TZ = timezone(timedelta(hours=5))
 from typing import List, Dict, Optional
 import aiohttp
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -97,13 +101,13 @@ async def should_send_sms_to_customer(customer_id: int, total_overdue_count: int
         try:
             sent_dt = datetime.fromisoformat(sent_at_val.replace("Z", "+00:00"))
         except Exception:
-            sent_dt = datetime.now(ZoneInfo("Asia/Tashkent"))
+            sent_dt = datetime.now(UZ_TZ)
     elif isinstance(sent_at_val, datetime):
         sent_dt = sent_at_val
     else:
         return True, "Yuboriladi"
         
-    now_dt = datetime.now(sent_dt.tzinfo if sent_dt.tzinfo else ZoneInfo("Asia/Tashkent"))
+    now_dt = datetime.now(sent_dt.tzinfo if sent_dt.tzinfo else UZ_TZ)
     days_diff = (now_dt.date() - sent_dt.date()).days
     
     if days_diff >= 2:
@@ -116,7 +120,7 @@ def build_admin_summary_messages(shop_name: str, total_count: int, total_amount:
                                  skipped_list: list, unlinked_list: list, 
                                  failed_list: list) -> List[str]:
     """Admin uchun 19:00 xabarnomasi — 3 kundan beri to'lamaganlar ro'yxati va SMS hisoboti"""
-    now_dt = datetime.now(ZoneInfo("Asia/Tashkent"))
+    now_dt = datetime.now(UZ_TZ)
     date_str = now_dt.strftime("%d.%m.%Y")
     
     total_overdue = len(overdue_3days_list)
@@ -253,7 +257,7 @@ async def send_reminders(bot, manual_admin_id: Optional[int] = None) -> dict:
         logger.error(f"❌ Qarzdor mijozlarni olishda xatolik: {e}")
         return {"total": 0, "overdue_3days": 0, "sent": 0, "skipped_2day": 0, "failed": 0, "unlinked": 0, "error": str(e)}
 
-    today_dt = datetime.now(ZoneInfo("Asia/Tashkent")).date()
+    today_dt = datetime.now(UZ_TZ).date()
 
     # Do'konlar bo'yicha guruhlash
     shops_data: Dict[str, dict] = {}

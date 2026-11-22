@@ -1707,6 +1707,11 @@
     // ROBUST API HELPER
     // ============================================================
     async function apiRequest(endpoint, method = 'GET', body = null) {
+      let url = endpoint;
+      if (method === 'GET') {
+        const sep = url.includes('?') ? '&' : '?';
+        url = `${url}${sep}_t=${Date.now()}`;
+      }
       const headers = {
         'Content-Type': 'application/json',
         'X-Shop-Id': shopData.shopId || '5832B1F2',
@@ -1714,10 +1719,10 @@
         'X-Admin-Name': String(tg?.initDataUnsafe?.user?.first_name || tg?.initDataUnsafe?.user?.username || ''),
         'X-Telegram-Init-Data': tg?.initData || ''
       };
-      const options = { method, headers };
+      const options = { method, headers, cache: 'no-store' };
       if (body) options.body = JSON.stringify(body);
 
-      const res = await fetch(endpoint, options);
+      const res = await fetch(url, options);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || `Server xatosi: ${res.status}`);
@@ -2119,6 +2124,16 @@
 
       try {
         const data = await apiRequest(`/api/customer/${id}`);
+        currentCustomerDetail = data;
+        if (allCustomers && allCustomers.length) {
+          const idx = allCustomers.findIndex(item => item.id === id);
+          if (idx !== -1) {
+            allCustomers[idx].total_debt = data.total_debt;
+            allCustomers[idx].full_name = data.full_name;
+            allCustomers[idx].phone = data.phone;
+            setLocalCache('dh_customers', allCustomers);
+          }
+        }
         const initials = (data.full_name || 'M').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
         const debtsHtml = data.debts && data.debts.length ? data.debts.map(d => {
@@ -2432,8 +2447,8 @@
           localStorage.removeItem('dh_user_me');
         } catch(e) {}
 
-        openCustomerDetail(activeCustomerId);
-        loadCustomers(true);
+        await openCustomerDetail(activeCustomerId);
+        await loadCustomers(true);
         loadDashboard(true);
       } catch (err) {
         haptic('notification', 'error');
@@ -2565,8 +2580,8 @@
           localStorage.removeItem('dh_user_me');
         } catch(e) {}
 
-        openCustomerDetail(activeCustomerId);
-        loadCustomers(true);
+        await openCustomerDetail(activeCustomerId);
+        await loadCustomers(true);
         loadDashboard(true);
       } catch (err) {
         haptic('notification', 'error');
