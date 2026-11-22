@@ -621,7 +621,7 @@ async def handle_favicon(request: web.Request):
 
 async def handle_health(request: web.Request):
     """Render va server salomatligini tekshirish uchun endpoint"""
-    return web.json_response({"status": "ok", "app": "dokon-hisobi", "version": "2.8"})
+    return web.json_response({"status": "ok", "app": "dokon-hisobi", "version": "2.9"})
 
 def create_web_app() -> web.Application:
     """Aiohttp veb ilovasini yaratish"""

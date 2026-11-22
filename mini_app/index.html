@@ -2136,9 +2136,13 @@
         }
         const initials = (data.full_name || 'M').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
-        const debtsHtml = data.debts && data.debts.length ? data.debts.map(d => {
+        const allDebts = data.debts || [];
+        const activeDebts = allDebts.filter(d => d.status !== 'paid');
+        const paidDebts = allDebts.filter(d => d.status === 'paid');
+
+        const debtsHtml = activeDebts.length ? activeDebts.map(d => {
           let isOverdue = d.status === 'overdue';
-          if (!isOverdue && d.status !== 'paid' && d.due_date) {
+          if (!isOverdue && d.due_date) {
             try {
               const today = new Date();
               today.setHours(0, 0, 0, 0);
@@ -2149,12 +2153,9 @@
               }
             } catch (e) {}
           }
-          const isPaid = d.status === 'paid';
-          let statusBadge = isPaid 
-            ? `<span class="badge badge-paid"><span class="badge-dot dot-success"></span> To'langan</span>` 
-            : isOverdue 
-              ? `<span class="badge badge-overdue"><span class="badge-dot dot-danger"></span> 3+ kun to'lamagan</span>` 
-              : `<span class="badge badge-active"><span class="badge-dot dot-warning"></span> Faol</span>`;
+          let statusBadge = isOverdue 
+            ? `<span class="badge badge-overdue"><span class="badge-dot dot-danger"></span> 3+ kun to'lamagan</span>` 
+            : `<span class="badge badge-active"><span class="badge-dot dot-warning"></span> Faol</span>`;
 
           const adminTag = (d.created_by_admin_name || d.created_by_admin_id) ? `
             <div class="debt-admin-tag">
@@ -2180,24 +2181,47 @@
                 <span>To'lov muddati:</span>
                 <b style="${isOverdue ? 'color:var(--danger)' : ''}">${formatDateLong(d.due_date)}</b>
               </div>
-              ${isPaid ? `
-                <div class="debt-row" style="color:var(--primary);margin-top:4px">
+              ${adminTag}
+            </div>`;
+        }).join('') : `
+          <div class="empty-box" style="padding:16px 12px;margin-bottom:12px">
+            <div class="empty-title" style="font-size:14px">Faol qarzlar yo'q</div>
+            <div class="empty-sub" style="font-size:12px">Barcha qarzlar to'langan yoki yangi qarz kiritilmagan</div>
+          </div>`;
+
+        const paidDebtsHtml = paidDebts.length ? `
+          <h4 class="section-title" style="margin:22px 0 10px;color:var(--text-muted);display:flex;align-items:center;gap:6px">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            To'langan qarzlar (${paidDebts.length})
+          </h4>
+          ${paidDebts.map(d => `
+            <div class="debt-item-card" style="opacity:0.75;background:var(--bg-app);border-left:4px solid #94a3b8">
+              <div class="debt-header">
+                <div>
+                  <div class="debt-desc" style="color:var(--text-muted)">${escHtml(d.description)}</div>
+                  <div class="debt-amount-big" style="color:var(--text-muted);text-decoration:line-through;font-size:16px">${formatMoney(d.amount)}</div>
+                </div>
+                <span class="badge badge-paid"><span class="badge-dot dot-success"></span> To'langan</span>
+              </div>
+              <div class="debt-row">
+                <span>Olingan sana:</span>
+                <b>${formatDateTimeUz(d.created_at || d.debt_date)}</b>
+              </div>
+              ${d.paid_date ? `
+                <div class="debt-row" style="color:var(--text-muted);margin-top:4px">
                   <span>To'langan sana:</span>
                   <b>${formatDateTimeUz(d.paid_date)}</b>
                 </div>
               ` : ''}
-              ${adminTag}
-            </div>`;
-        }).join('') : `
-          <div class="empty-box">
-            <div class="empty-icon-wrap">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
+              ${(d.created_by_admin_name || d.created_by_admin_id) ? `
+                <div class="debt-admin-tag">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  <span>Qo'shgan admin: <b>${escHtml(d.created_by_admin_name || ('Admin ' + d.created_by_admin_id))}</b></span>
+                </div>
+              ` : ''}
             </div>
-            <div class="empty-title">Qarzlar mavjud emas</div>
-            <div class="empty-sub">Barcha qarzlar to'langan</div>
-          </div>`;
+          `).join('')}
+        ` : '';
 
         // Bugungi hisob-kitob (O'zbekiston / Farg'ona vaqti bo'yicha)
         const todayStr = getLocalDateString();
@@ -2310,8 +2334,9 @@
             </div>
           </div>
           
-          <h4 class="section-title" style="margin-bottom:12px">Qarzlar Tarixi (${data.debts?.length || 0})</h4>
+          <h4 class="section-title" style="margin-bottom:12px">Qarzlar ro'yxati (${activeDebts.length} ta faol)</h4>
           ${debtsHtml}
+          ${paidDebtsHtml}
           ${todaySummaryHtml}
           ${paymentsHtml}
         `;
