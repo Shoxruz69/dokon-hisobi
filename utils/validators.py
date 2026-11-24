@@ -30,13 +30,13 @@ def validate_phone(phone: str) -> Tuple[bool, str]:
         normalized = '+' + digits
     elif cleaned.startswith('996') and len(digits) == 12:
         normalized = '+' + digits
+    elif cleaned.startswith('8') and len(digits) == 11 and digits.startswith(('87', '89', '88')):
+        # Rossiya/Qozog'iston ichki formati (8701... -> +7701..., 8916... -> +7916...)
+        normalized = '+7' + digits[1:]
     elif cleaned.startswith('7') and len(digits) == 11:
         normalized = '+' + digits
-    elif cleaned.startswith('8') and len(digits) == 11:
-        # Rossiya/Qozog'iston ichki formati (8916... -> +7916...)
-        normalized = '+7' + digits[1:]
     elif len(digits) == 9:
-        # O'zbekiston 9 xonali mahalliy raqam (88..., 90..., 91..., va boshqalar)
+        # O'zbekiston 9 xonali mahalliy raqam (87..., 88..., 90..., va har qanday operator)
         normalized = '+998' + digits
     elif len(digits) == 10 and digits.startswith('0'):
         # 090... -> +99890...
@@ -44,31 +44,10 @@ def validate_phone(phone: str) -> Tuple[bool, str]:
     else:
         normalized = '+' + digits
 
-    # E.164 standarti: + va 7 tadan 15 tagacha raqam
+    # E.164 standarti: + va kamida 7 tadan 15 tagacha raqam (har qanday xalqaro yoki mahalliy raqam qabul qilinadi)
     if not re.match(r'^\+[1-9]\d{6,14}$', normalized):
         return False, "❌ Noto'g'ri telefon raqam. Raqam kamida 7 ta belgidan iborat bo'lishi kerak."
 
-    # Maxsus tekshiruvlar:
-    # 1. O'zbekiston (+998)
-    if normalized.startswith('+998'):
-        if len(normalized) != 13:
-            return False, "❌ O'zbekiston raqami 9 ta raqamdan iborat bo'lishi kerak. Masalan: +998901234567"
-        valid_prefixes = ['90','91','92','93','94','95','97','98','99','33','50','55','77','71','72','73','74','75','76','78','88']
-        prefix = normalized[4:6]
-        if prefix not in valid_prefixes:
-            return False, f"❌ Noto'g'ri operator kodi ({prefix}). O'zbek raqamini to'g'ri kiriting."
-
-    # 2. Rossiya / Qozog'iston (+7)
-    elif normalized.startswith('+7'):
-        if len(normalized) != 12:
-            return False, "❌ Rossiya/Qozog'iston raqami 10 ta raqamdan iborat bo'lishi kerak. Masalan: +79161234567"
-
-    # 3. Qirg'iziston (+996)
-    elif normalized.startswith('+996'):
-        if len(normalized) != 13:
-            return False, "❌ Qirg'iziston raqami 9 ta raqamdan iborat bo'lishi kerak. Masalan: +996555123456"
-
-    # 4. Boshqa har qanday xalqaro raqam muvaffaqiyatli qabul qilinadi
     return True, normalized
 
 def validate_amount(amount_str: Union[str, int, float]) -> Tuple[bool, Union[float, str]]:

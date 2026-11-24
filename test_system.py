@@ -31,6 +31,12 @@ async def run_tests():
     assert ok and phone88 == "+998887325515", f"Phone 88 xato: {phone88}"
     ok, phone88_loc = validate_phone("887325515")
     assert ok and phone88_loc == "+998887325515", f"Phone 88 local xato: {phone88_loc}"
+    ok, phone87 = validate_phone("+998 87 123 45 67")
+    assert ok and phone87 == "+998871234567", f"Phone 87 xato: {phone87}"
+    ok, phone87_loc = validate_phone("871234567")
+    assert ok and phone87_loc == "+998871234567", f"Phone 87 local xato: {phone87_loc}"
+    ok, phone87_kz = validate_phone("87011234567")
+    assert ok and phone87_kz == "+77011234567", f"Phone 87 KZ xato: {phone87_kz}"
     ok, phone_ru = validate_phone("+7 916 123 45 67")
     assert ok and phone_ru == "+79161234567", f"Phone RU xato: {phone_ru}"
     ok, phone_kz = validate_phone("+7 701 123 45 67")

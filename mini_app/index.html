@@ -2694,7 +2694,7 @@
       try {
         const payload = {
           full_name: name,
-          phone: phoneDigits.length >= 7 ? (phoneRaw.startsWith('+') ? phoneRaw.replace(/\s+/g, '') : '+' + phoneDigits) : null,
+          phone: phoneDigits.length >= 7 ? (phoneRaw.startsWith('+') ? phoneRaw.replace(/\s+/g, '') : (phoneDigits.length === 9 ? '+998' + phoneDigits : (phoneDigits.length === 11 && phoneDigits.startsWith('87') ? '+7' + phoneDigits.substring(1) : '+' + phoneDigits))) : null,
           notes: notes || null
         };
         const res = await apiRequest(`/api/customer/${customerId}/edit`, 'POST', payload);
@@ -2798,7 +2798,9 @@
     function detectCountryFromPhone(str) {
       if (!str) return 'uz';
       const clean = str.replace(/[\s\-\(\)]/g, '');
+      const digits = clean.replace(/\D/g, '');
       if (clean.startsWith('+998') || clean.startsWith('998')) return 'uz';
+      if ((digits.startsWith('87') || digits.startsWith('77')) && digits.length >= 10) return 'kz';
       if (clean.startsWith('+7') || (clean.startsWith('7') && clean.length >= 10)) return 'ru';
       if (clean.startsWith('+996') || clean.startsWith('996')) return 'kg';
       if (clean.startsWith('+')) return 'other';
@@ -2813,26 +2815,34 @@
       const allDigits = str.replace(/\D/g, '');
       if (!allDigits) return str.startsWith('+') ? '+' : '';
 
+      // Agar Qozog'iston 87... / 77... 10-11 xonali raqami kiritilayotgan bo'lsa
+      if ((allDigits.startsWith('87') || allDigits.startsWith('77')) && allDigits.length >= 10) {
+        country = 'kz';
+      }
+
       if (country === 'uz') {
         let sub = allDigits;
         if (sub.startsWith('998')) {
           sub = sub.substring(3);
         }
-        sub = sub.substring(0, 9);
-        if (!sub) return '';
-        let res = '+998';
-        if (sub.length > 0) res += ' ' + sub.substring(0, 2);
-        if (sub.length > 2) res += ' ' + sub.substring(2, 5);
-        if (sub.length > 5) res += ' ' + sub.substring(5, 7);
-        if (sub.length > 7) res += ' ' + sub.substring(7, 9);
-        return res;
+        // Agar 9 tadan ko'p bo'lsa, foydalanuvchi sonini kesib tashlamaymiz (erkin kiritish!)
+        if (sub.length > 9) {
+          country = 'other';
+        } else {
+          let res = '+998';
+          if (sub.length > 0) res += ' ' + sub.substring(0, 2);
+          if (sub.length > 2) res += ' ' + sub.substring(2, 5);
+          if (sub.length > 5) res += ' ' + sub.substring(5, 7);
+          if (sub.length > 7) res += ' ' + sub.substring(7, 9);
+          return res;
+        }
       }
 
       if (country === 'ru' || country === 'kz') {
         let sub = allDigits;
         if (sub.startsWith('7')) {
           sub = sub.substring(1);
-        } else if (sub.startsWith('8') && sub.length === 11) {
+        } else if (sub.startsWith('8') && sub.length >= 10) {
           sub = sub.substring(1);
         }
         sub = sub.substring(0, 10);
@@ -2947,10 +2957,16 @@
 
         let country = this.dataset.country || 'uz';
         const rawClean = val.replace(/[\s\-\(\)]/g, '');
+        const digits = rawClean.replace(/\D/g, '');
+
         if (rawClean.startsWith('+7') && country !== 'ru' && country !== 'kz') {
           country = 'ru';
           this.dataset.country = 'ru';
           updateActiveChip(elId, 'ru');
+        } else if ((digits.startsWith('87') || digits.startsWith('77')) && digits.length >= 10 && country !== 'kz') {
+          country = 'kz';
+          this.dataset.country = 'kz';
+          updateActiveChip(elId, 'kz');
         } else if (rawClean.startsWith('+996') && country !== 'kg') {
           country = 'kg';
           this.dataset.country = 'kg';
@@ -3030,7 +3046,7 @@
         const payload = {
           shop_id: shopData.shopId || '5832B1F2',
           full_name: name,
-          phone: phoneDigits.length >= 7 ? (phoneRaw.startsWith('+') ? phoneRaw.replace(/\s+/g, '') : '+' + phoneDigits) : null,
+          phone: phoneDigits.length >= 7 ? (phoneRaw.startsWith('+') ? phoneRaw.replace(/\s+/g, '') : (phoneDigits.length === 9 ? '+998' + phoneDigits : (phoneDigits.length === 11 && phoneDigits.startsWith('87') ? '+7' + phoneDigits.substring(1) : '+' + phoneDigits))) : null,
           amount: amount,
           description: desc,
           due_date: date,
@@ -3239,7 +3255,7 @@
               <span class="stats-kpi-title" style="color:var(--danger)">Berilgan qarz</span>
               <span class="tx-badge-given">${daily.given_debts_count || 0} ta qarz</span>
             </div>
-            <div class="stats-kpi-amount" style="color:var(--danger)">-${formatMoney(daily.given_total_sum || 0)}</div>
+            <div class="stats-kpi-amount" style="color:var(--danger)">+${formatMoney(daily.given_total_sum || 0)}</div>
             <div class="stats-kpi-sub">
               👤 <b>${daily.given_customers_count || 0} ta</b> odamga qarz berildi
             </div>
@@ -3251,7 +3267,7 @@
               <span class="stats-kpi-title" style="color:var(--primary)">Undirilgan to'lov</span>
               <span class="tx-badge-paid">${daily.collected_payments_count || 0} ta to'lov</span>
             </div>
-            <div class="stats-kpi-amount" style="color:var(--primary)">+${formatMoney(daily.collected_total_sum || 0)}</div>
+            <div class="stats-kpi-amount" style="color:var(--primary)">-${formatMoney(daily.collected_total_sum || 0)}</div>
             <div class="stats-kpi-sub">
               💰 <b>${daily.collected_customers_count || 0} ta</b> odamdan to'lov qabul qilindi
             </div>
@@ -3277,7 +3293,7 @@
               <div class="debt-header">
                 <div>
                   <div class="debt-desc">${escHtml(item.customer_name)} <span style="font-weight:400;color:var(--text-muted);font-size:12px">(${escHtml(item.customer_phone || '')})</span></div>
-                  <div class="debt-amount-big" style="color:var(--danger)">-${formatMoney(item.amount)}</div>
+                  <div class="debt-amount-big" style="color:var(--danger)">+${formatMoney(item.amount)}</div>
                 </div>
                 <span class="tx-badge-given">Qarz berildi</span>
               </div>
@@ -3317,7 +3333,7 @@
               <div class="debt-header">
                 <div>
                   <div class="debt-desc">${escHtml(item.customer_name)} <span style="font-weight:400;color:var(--text-muted);font-size:12px">(${escHtml(item.customer_phone || '')})</span></div>
-                  <div class="debt-amount-big" style="color:var(--primary)">+${formatMoney(item.amount)}</div>
+                  <div class="debt-amount-big" style="color:var(--primary)">-${formatMoney(item.amount)}</div>
                 </div>
                 <span class="tx-badge-paid">To'lov</span>
               </div>
@@ -3355,7 +3371,7 @@
               <span class="stats-kpi-title" style="color:var(--danger)">Shu oyda berilgan qarz</span>
               <span class="tx-badge-given">${monthly.given_debts_count || 0} ta qarz</span>
             </div>
-            <div class="stats-kpi-amount" style="color:var(--danger)">-${formatMoney(monthly.given_total_sum || 0)}</div>
+            <div class="stats-kpi-amount" style="color:var(--danger)">+${formatMoney(monthly.given_total_sum || 0)}</div>
             <div class="stats-kpi-sub">
               👤 <b>${monthly.given_customers_count || 0} ta</b> mijozga berildi
             </div>
@@ -3367,7 +3383,7 @@
               <span class="stats-kpi-title" style="color:var(--primary)">Shu oyda undirilgan to'lov</span>
               <span class="tx-badge-paid">${monthly.collected_payments_count || 0} ta to'lov</span>
             </div>
-            <div class="stats-kpi-amount" style="color:var(--primary)">+${formatMoney(monthly.collected_total_sum || 0)}</div>
+            <div class="stats-kpi-amount" style="color:var(--primary)">-${formatMoney(monthly.collected_total_sum || 0)}</div>
             <div class="stats-kpi-sub">
               💰 <b>${monthly.collected_customers_count || 0} ta</b> mijozdan qabul qilindi
             </div>
